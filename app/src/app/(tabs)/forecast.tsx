@@ -5,7 +5,6 @@ import {
   View,
   StyleSheet,
   Pressable,
-  ActivityIndicator,
   Platform,
   useWindowDimensions,
 } from "react-native";
@@ -19,6 +18,9 @@ import { StatCard } from "@/components/stat-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SystemHeader } from "@/components/ui/system-header";
 import { MonitorSwitch } from "@/components/monitor-switch";
+import { LoadingState } from "@/components/ui/loading-state";
+import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
 import { useAppTheme } from "@/lib/theme-context";
 
 export default function Forecast() {
@@ -140,20 +142,27 @@ export default function Forecast() {
   }, [xgbPoints, actualPoints]);
 
   const chartLegends: LegendItem[] = useMemo(() => {
-    return [
+    const list: LegendItem[] = [
       { label: "24h Quá khứ", color: colors.accent, style: "solid" },
-      { label: "24h Dự báo XGBoost", color: colors.primary, style: "dashed" },
+      { label: "24h XGBoost", color: colors.primary, style: "dashed" },
     ];
-  }, [colors]);
+    if (naivePoints.length > 0) {
+      list.push({ label: "24h Naive Baseline", color: colors.warning, style: "dotted" });
+    }
+    return list;
+  }, [colors, naivePoints.length]);
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <SystemHeader
-        title="🤖 Dự báo phụ tải"
+        title="Dự báo phụ tải"
         subtitle="Mô hình hồi quy chuỗi thời gian 96 bước (24 giờ tiếp theo)"
       />
 
-      <ScrollView style={styles.screen} contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}>
+      <ScrollView
+        style={styles.screen}
+        contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}
+      >
         {/* MONITOR SWITCH COMPONENT */}
         <MonitorSwitch />
 
@@ -217,9 +226,7 @@ export default function Forecast() {
                 style={[
                   styles.insightBanner,
                   {
-                    backgroundColor: insights.isOverThreshold
-                      ? colors.surfaceSubtle
-                      : colors.surfaceSubtle,
+                    backgroundColor: colors.surfaceSubtle,
                     borderColor: insights.isOverThreshold ? colors.error : colors.border,
                   },
                 ]}
@@ -231,8 +238,8 @@ export default function Forecast() {
                   ]}
                 >
                   {insights.isOverThreshold
-                    ? "⚠️ Cảnh báo đỉnh phụ tải dự kiến vượt ngưỡng"
-                    : "💡 Gợi ý vận hành điện năng"}
+                    ? "Cảnh báo đỉnh phụ tải dự kiến vượt ngưỡng an toàn"
+                    : "Gợi ý vận hành và điều phối phụ tải"}
                 </Text>
                 <Text style={[styles.insightDesc, { color: colors.text }]}>
                   {insights.isOverThreshold
@@ -305,6 +312,7 @@ export default function Forecast() {
                   style={[
                     styles.segmentBtnText,
                     { color: activeTab === "chart" ? colors.text : colors.textSecondary },
+                    activeTab === "chart" && { fontWeight: "600" },
                   ]}
                 >
                   Đồ thị so sánh 24 giờ
@@ -325,6 +333,7 @@ export default function Forecast() {
                   style={[
                     styles.segmentBtnText,
                     { color: activeTab === "steps" ? colors.text : colors.textSecondary },
+                    activeTab === "steps" && { fontWeight: "600" },
                   ]}
                 >
                   Bảng chi tiết 96 bước
@@ -345,6 +354,7 @@ export default function Forecast() {
                   style={[
                     styles.segmentBtnText,
                     { color: activeTab === "benchmark" ? colors.text : colors.textSecondary },
+                    activeTab === "benchmark" && { fontWeight: "600" },
                   ]}
                 >
                   Đánh giá sai số (Metrics)
@@ -355,23 +365,26 @@ export default function Forecast() {
             {/* CHART TAB: MULTI-LINE OVERLAY */}
             {activeTab === "chart" && (
               <FuturisticCard
-                title="Đồ thị phụ tải thực tế & dự báo 24 giờ"
-                subtitle="Quy ước: Nét liền = Thực tế, Nét đứt = Dự báo XGBoost, Nét chấm = Baseline Naive"
-                badge={<StatusBadge status="success" label="96 bước" />}
+                title="Đồ thị phụ tải thực tế & dự báo liên tục 48 giờ"
+                subtitle="Nối tiếp: [24h Quá khứ thực tế] -> [Điểm neo Hiện tại] -> [24h Dự báo tương lai]"
+                badge={<StatusBadge status="success" label="Trục 48h liên tục" />}
               >
-                {fcXgb.isLoading ? (
-                  <View style={styles.loadingBox}>
-                    <ActivityIndicator color={colors.accent} size="small" />
-                    <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                      Đang tải dữ liệu dự báo...
-                    </Text>
-                  </View>
+                {fcXgb.isError ? (
+                  <ErrorState
+                    title="Lỗi tải dữ liệu dự báo"
+                    message="Không thể kết nối đến API /forecast của Backend."
+                    onRetry={() => {
+                      fcXgb.refetch();
+                      hist.refetch();
+                    }}
+                  />
+                ) : fcXgb.isLoading ? (
+                  <LoadingState message="Đang tải dữ liệu dự báo 96 bước..." height={200} />
                 ) : xgbPoints.length === 0 && actualPoints.length === 0 ? (
-                  <View style={styles.emptyBox}>
-                    <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
-                      Chưa có bản ghi dự báo trong cơ sở dữ liệu
-                    </Text>
-                  </View>
+                  <EmptyState
+                    title="Chưa có dữ liệu dự báo"
+                    description="Hệ thống cần tối thiểu các mẫu đo lường quá khứ để chạy chu trình dự báo XGBoost."
+                  />
                 ) : (
                   <PowerChart
                     points={actualPoints.length > 0 ? actualPoints : xgbPoints}
@@ -379,6 +392,9 @@ export default function Forecast() {
                     points2={xgbPoints.length > 0 ? xgbPoints : undefined}
                     color2={colors.primary}
                     strokeDashArray2={[6, 4]}
+                    points3={naivePoints.length > 0 ? naivePoints : undefined}
+                    color3={colors.warning}
+                    strokeDashArray3={[2, 3]}
                     legend={chartLegends}
                     height={220}
                     unit=" W"
@@ -394,7 +410,7 @@ export default function Forecast() {
                 title="Chi tiết 96 bước dự báo phụ tải"
                 subtitle="Bản ghi từng mốc thời gian slot 15 phút với giá trị p_hat"
               >
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={true}>
                   <View style={[styles.tableWrapper, { borderColor: colors.border, minWidth: isMobile ? 520 : undefined }]}>
                     <View
                       style={[
@@ -428,11 +444,10 @@ export default function Forecast() {
                     </View>
 
                     {xgbPoints.length === 0 ? (
-                      <View style={styles.emptyBox}>
-                        <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
-                          Không có dữ liệu bước dự báo
-                        </Text>
-                      </View>
+                      <EmptyState
+                        title="Không có bước dự báo"
+                        description="Mô hình XGBoost chưa tạo ra chuỗi dự báo cho phiên làm việc này."
+                      />
                     ) : (
                       (fcXgb.data ?? []).map((row, idx) => (
                         <View
@@ -483,21 +498,15 @@ export default function Forecast() {
             {activeTab === "benchmark" && (
               <FuturisticCard
                 title="Đánh giá sai số mô hình (Benchmark Metrics)"
-                subtitle="Tính trên cùng một tập kiểm thử 8 ngày độc lập (dropna)"
+                subtitle="Chỉ số MAE, RMSE, sMAPE của lần kiểm thử mới nhất từ Backend"
               >
                 {mt.isLoading ? (
-                  <View style={styles.loadingBox}>
-                    <ActivityIndicator color={colors.accent} size="small" />
-                    <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-                      Đang tải chỉ số đánh giá...
-                    </Text>
-                  </View>
+                  <LoadingState message="Đang tải chỉ số đánh giá sai số mô hình..." height={150} />
                 ) : !mt.data || mt.data.length === 0 ? (
-                  <View style={styles.emptyBox}>
-                    <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
-                      Chưa có dữ liệu kiểm thử mô hình trong bảng forecast_metrics (cần tối thiểu 10 ngày dữ liệu để huấn luyện đầy đủ)
-                    </Text>
-                  </View>
+                  <EmptyState
+                    title="Chưa có dữ liệu kiểm thử"
+                    description="Cơ sở dữ liệu chưa ghi nhận bản ghi nào trong bảng forecast_metrics (cần dữ liệu huấn luyện và kiểm thử từ pipeline)."
+                  />
                 ) : (
                   <View style={styles.metricsGrid}>
                     {mt.data.map((m) => (
@@ -517,7 +526,7 @@ export default function Forecast() {
                           </Text>
                           <StatusBadge
                             status={m.model === "xgboost" ? "primary" : "neutral"}
-                            label={m.model === "xgboost" ? "Chính thức" : "Tham chiếu"}
+                            label={m.model === "xgboost" ? "Mô hình chính" : "Tham chiếu"}
                           />
                         </View>
                         <View style={styles.scorecardRow}>
@@ -566,7 +575,7 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 16,
-    maxWidth: 1100,
+    maxWidth: 1200,
     width: "100%",
     alignSelf: "center",
   },
@@ -575,46 +584,48 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   disabledCard: {
-    padding: 32,
+    padding: 24,
     borderRadius: 8,
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 10,
-    marginTop: 8,
+    gap: 8,
   },
   disabledBadge: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 16,
+    borderRadius: 4,
     borderWidth: 1,
   },
   disabledBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "500",
   },
   disabledTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "600",
+    marginTop: 4,
   },
   disabledDesc: {
-    fontSize: 13,
+    fontSize: 12,
     textAlign: "center",
-    maxWidth: 400,
+    maxWidth: 380,
     lineHeight: 18,
   },
   modelBanner: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 10,
     padding: 14,
     borderRadius: 8,
     borderWidth: 1,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
   },
   modelBannerLeft: {
     gap: 2,
+    flex: 1,
+    minWidth: 200,
   },
   modelTitle: {
     fontSize: 14,
@@ -640,71 +651,48 @@ const styles = StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 12,
+    gap: 10,
   },
   segmentedGroup: {
     flexDirection: "row",
     borderRadius: 6,
     borderWidth: 1,
     padding: 2,
-    gap: 2,
   },
   segmentBtn: {
     flex: 1,
-    minHeight: 38,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
+    paddingVertical: 7,
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 4,
     borderWidth: 1,
     borderColor: "transparent",
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
   },
   segmentBtnText: {
     fontSize: 12,
-    fontWeight: "500",
-    textAlign: "center",
-  },
-  loadingBox: {
-    padding: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  loadingText: {
-    fontSize: 12,
-  },
-  emptyBox: {
-    padding: 24,
-    alignItems: "center",
-  },
-  emptyTitle: {
-    fontSize: 12,
-    textAlign: "center",
-    lineHeight: 18,
   },
   tableWrapper: {
-    borderWidth: 1,
+    width: "100%",
     borderRadius: 6,
     overflow: "hidden",
   },
   tableHeader: {
     flexDirection: "row",
     paddingVertical: 8,
-    paddingHorizontal: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
   },
   th: {
     fontSize: 11,
     fontWeight: "600",
+    letterSpacing: 0.2,
   },
   tableRow: {
     flexDirection: "row",
-    alignItems: "center",
     paddingVertical: 8,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderBottomWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
   },
   td: {
     fontSize: 12,
@@ -716,15 +704,15 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   scorecard: {
-    borderRadius: 6,
     padding: 14,
+    borderRadius: 8,
     borderWidth: 1,
     gap: 10,
   },
   scorecardHead: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "center",
   },
   scorecardTitle: {
     fontSize: 14,
@@ -733,11 +721,11 @@ const styles = StyleSheet.create({
   scorecardRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 16,
+    gap: 12,
   },
   scorecardItem: {
     flex: 1,
-    minWidth: 120,
+    minWidth: 130,
     gap: 2,
   },
   metricLabel: {
@@ -745,7 +733,7 @@ const styles = StyleSheet.create({
   },
   metricVal: {
     fontSize: 16,
-    fontWeight: "600",
+    fontWeight: "700",
     fontFamily: Platform.select({ default: "monospace" }),
   },
 });

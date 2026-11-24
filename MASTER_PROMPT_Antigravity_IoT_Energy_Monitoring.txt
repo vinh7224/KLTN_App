@@ -1,0 +1,1199 @@
+MASTER PROMPT – TOÀN DIỆN PHÂN TÍCH, SỬA LỖI VÀ NÂNG CẤP ỨNG DỤNG IoT ENERGY MONITORING
+
+1. VAI TRÒ VÀ NHIỆM VỤ
+
+Bạn là Senior Full-stack Engineer, React Native / Expo Architect, UI/UX Designer và Software Quality Engineer.
+
+Nhiệm vụ của bạn là trực tiếp phân tích, chỉnh sửa, tối ưu và hoàn thiện ứng dụng IoT giám sát, phân tích và dự báo nhu cầu sử dụng điện năng thông minh.
+
+Đây là một dự án khóa luận tốt nghiệp, do đó cần đảm bảo đồng thời:
+- Tính chính xác kỹ thuật.
+- Tính ổn định của hệ thống.
+- Tính nhất quán của dữ liệu.
+- Trải nghiệm người dùng chuyên nghiệp.
+- Giao diện hiện đại, tối giản.
+- Khả năng sử dụng trên Web Desktop, Web Mobile, Android và iOS.
+- Khả năng trình diễn, kiểm thử và nghiệm thu thực tế.
+
+YÊU CẦU QUAN TRỌNG: Không chỉ phân tích hoặc đưa ra khuyến nghị. Hãy trực tiếp chỉnh sửa mã nguồn của repository để hoàn thành công việc.
+
+Không được xây dựng lại dự án từ đầu nếu kiến trúc hiện tại vẫn có thể được tận dụng và cải thiện.
+
+2. THÔNG TIN VÀ KIẾN TRÚC DỰ ÁN
+
+Đọc kỹ các tài liệu sau trước khi chỉnh sửa:
+- AGENTS.md
+- app/AGENTS.md nếu có.
+- PRODUCT.md
+- app/PRODUCT.md
+- DESIGN.md
+- app/DESIGN.md
+- cam_nang_test_app.md
+- app/package.json
+- app/app.json
+
+Nếu có hai tài liệu cùng tên ở root và thư mục app, xác định phạm vi áp dụng của từng tài liệu. Không tự ý ghi đè hoặc xóa nội dung đang có.
+
+Kiến trúc hệ thống
+
+Hardware / Firmware:
+- ESP32.
+- Cảm biến đo điện năng PZEM-004T.
+- Rơ-le điều khiển tải.
+- Giao tiếp Wi-Fi và MQTT.
+
+Communication:
+- Mosquitto MQTT Broker.
+- Telemetry.
+- Relay command.
+- Relay state.
+- Last Will và cơ chế phát hiện Online/Offline.
+
+Backend:
+- Python.
+- FastAPI.
+- SQLite WAL.
+- REST API.
+- WebSocket.
+- JWT Authentication.
+- Scheduler và các pipeline xử lý dữ liệu.
+
+Machine Learning:
+- XGBoost.
+- Seasonal Naive.
+- ARIMA khi Backend thực sự có dữ liệu và kết quả tương ứng.
+- MAE, RMSE, sMAPE.
+- Dự báo 24 giờ với 96 bước, chu kỳ 15 phút.
+
+Frontend:
+- Expo.
+- React Native.
+- TypeScript.
+- Expo Router.
+- TanStack React Query.
+- React Native Gifted Charts.
+- React Native SVG.
+- React Native Skia.
+
+Những thư mục frontend cần tập trung
+
+app/
+├── app.json
+├── package.json
+├── tsconfig.json
+├── DESIGN.md
+├── PRODUCT.md
+└── src/
+    ├── global.css
+    ├── app/
+    │   ├── _layout.tsx
+    │   ├── login.tsx
+    │   └── (tabs)/
+    │       ├── _layout.tsx
+    │       ├── index.tsx
+    │       ├── history.tsx
+    │       ├── forecast.tsx
+    │       ├── alerts.tsx
+    │       ├── control.tsx
+    │       └── settings.tsx
+    ├── components/
+    │   ├── app-tabs.tsx
+    │   ├── app-tabs.web.tsx
+    │   ├── monitor-switch.tsx
+    │   ├── power-chart.tsx
+    │   ├── stat-card.tsx
+    │   └── ui/
+    ├── constants/
+    │   ├── theme.ts
+    │   └── ui.ts
+    ├── hooks/
+    │   ├── use-live.ts
+    │   ├── use-refresh.ts
+    │   └── use-relay.ts
+    └── lib/
+        ├── api.ts
+        ├── auth.tsx
+        ├── monitor.tsx
+        ├── storage.ts
+        └── theme-context.tsx
+
+Có thể bổ sung component, hook, utility hoặc Provider mới nếu thực sự cần thiết. Phải tuân thủ kiến trúc hiện có và tránh tạo các lớp trừu tượng không cần thiết.
+
+3. CÁC NGUYÊN TẮC KHÔNG ĐƯỢC VI PHẠM
+
+Đây là những ràng buộc bắt buộc.
+
+3.1. Bảo toàn Backend API
+- Không đổi tên endpoint.
+- Không thay đổi HTTP method.
+- Không thay đổi request payload.
+- Không đổi response schema.
+- Không thay đổi cơ chế JWT.
+- Không thay đổi logic phân quyền phía Backend.
+- Không thay đổi cấu trúc cơ sở dữ liệu.
+- Không tự tạo endpoint mới nếu Backend không cung cấp.
+
+Chỉ được điều chỉnh cách Frontend sử dụng và hiển thị dữ liệu để tương thích chính xác với API hiện tại.
+
+3.2. Bảo toàn MQTT
+
+Không được thay đổi:
+- MQTT topic.
+- QoS.
+- Payload.
+- Device ID.
+- Cấu trúc telemetry.
+- Relay command.
+- Relay state.
+- Last Will.
+- Cơ chế xác nhận hai chiều.
+
+Giữ nguyên luồng dữ liệu hiện có.
+
+3.3. Bảo toàn Machine Learning
+- Không thay đổi thuật toán XGBoost.
+- Không thay đổi logic dự báo Seasonal Naive.
+- Không tự tạo kết quả ARIMA.
+- Không sửa công thức đánh giá ML khi chưa có căn cứ kỹ thuật.
+- Không tạo số liệu dự báo giả để làm đẹp biểu đồ.
+- Không thay thế dữ liệu thật bằng mock data trong môi trường production.
+- Không hiển thị một mô hình là đã hoạt động khi Backend chưa trả kết quả.
+
+3.4. Bảo toàn an toàn điều khiển rơ-le
+
+Đây là yêu cầu đặc biệt nghiêm ngặt.
+- Chỉ tài khoản admin được gửi lệnh.
+- Viewer không được điều khiển.
+- Không bỏ modal xác nhận.
+- Không bỏ cơ chế xác nhận ba bước.
+- Không tự động hiển thị rơ-le đã bật/tắt thành công chỉ vì API trả về đã nhận lệnh.
+- Chỉ hiển thị thành công khi có phản hồi xác nhận tiếp điểm tương ứng.
+- Giữ nguyên timeout, error handling và các điều kiện bảo vệ đã có.
+- Không thực hiện thao tác đóng/ngắt lặp khi lệnh trước chưa hoàn thành.
+
+Backend vẫn là nơi kiểm soát quyền cuối cùng.
+
+3.5. Quy tắc chỉnh sửa code
+- Không xóa chức năng đang hoạt động.
+- Không xóa file chỉ vì chưa thấy được sử dụng trực tiếp.
+- Không viết lại toàn bộ file nếu chỉ cần sửa một phần.
+- Không tạo nhiều component trùng chức năng.
+- Không hardcode màu trong component khi đã có theme token.
+- Không đặt API call trực tiếp rải rác trong giao diện nếu có thể tái sử dụng lớp service hiện tại.
+- Không cài thư viện trùng lặp.
+- Không tự ý cập nhật toàn bộ dependency.
+- Không sửa thư mục native android/, ios/ trực tiếp nếu chưa có lý do bắt buộc.
+- Không xóa hoặc ghi đè thay đổi có sẵn của người phát triển.
+
+Trước khi bắt đầu:
+1. Kiểm tra Git status.
+2. Xác định các thay đổi chưa commit.
+3. Bảo vệ các thay đổi hiện có.
+4. Không chạy lệnh reset, clean hoặc force checkout.
+5. Có thể tạo nhánh làm việc riêng nếu repository cho phép.
+
+4. GIAI ĐOẠN 1 – RÀ SOÁT VÀ SỬA LỖI KỸ THUẬT
+
+Thực hiện trước khi redesign giao diện.
+
+4.1. Tối ưu WebSocket và useLive
+
+Kiểm tra:
+- src/hooks/use-live.ts
+- src/components/ui/system-header.tsx
+- src/app/(tabs)/index.tsx
+- src/app/(tabs)/settings.tsx
+- src/app/_layout.tsx
+
+Hiện tại useLive() được gọi tại nhiều vị trí. Cần kiểm tra nguy cơ nhiều WebSocket cùng kết nối /ws/live.
+
+Phương án đề xuất:
+
+Xây dựng một LiveProvider quản lý kết nối WebSocket dùng chung.
+
+Yêu cầu:
+- Một WebSocket owner duy nhất cho toàn bộ ứng dụng.
+- Các component chỉ tiêu thụ dữ liệu qua context.
+- Chỉ kết nối khi người dùng đã đăng nhập và bật giám sát.
+- Khi tắt giám sát, đóng kết nối.
+- Khi đăng xuất, đóng kết nối.
+- Khi mất kết nối, tự reconnect.
+- Tránh tạo nhiều reconnect timer.
+- Xử lý race condition khi thay đổi token hoặc server URL.
+- Xử lý dữ liệu JSON không hợp lệ.
+- Không để kết nối cũ ghi đè trạng thái kết nối mới.
+- Cập nhật stale sau 5 giây không nhận được dữ liệu hợp lệ.
+- Tính latency đúng theo timestamp nguồn.
+- Không giữ dữ liệu cũ và hiển thị như dữ liệu realtime mới.
+
+Giữ nguyên URL /ws/live, phương thức xác thực và giao thức hiện tại.
+
+4.2. Sửa lỗi API Diagnostics
+
+Đọc trực tiếp API /diagnostics trong Backend để xác nhận response schema.
+
+Dữ liệu hiện tại được Backend trả về theo cấu trúc:
+
+{
+  "link_stats": {
+    "recv": 0,
+    "dup": 0,
+    "disconnect": 0,
+    "reconnect_avg_s": 0.0
+  },
+  "boot_packet_loss": [
+    {
+      "boot": 1,
+      "min_seq": 1,
+      "max_seq": 100,
+      "received": 98,
+      "expected": 100,
+      "loss_rate": 0.02
+    }
+  ]
+}
+
+Đây là ví dụ cấu trúc, không phải số liệu thực tế.
+
+Kiểm tra settings.tsx đang đọc các thuộc tính link và loss, trong khi Backend sử dụng link_stats và boot_packet_loss.
+
+Sửa mapping Frontend cho đúng.
+
+Yêu cầu hiển thị:
+- Tổng số bản tin nhận.
+- Số bản tin trùng.
+- Số lần ngắt kết nối.
+- Thời gian phục hồi trung bình.
+- Tỷ lệ mất gói.
+- Số gói dự kiến.
+- Số gói đã nhận.
+
+Đối với tỷ lệ mất gói:
+- Sử dụng loss_rate mà Backend tính toán.
+- Hiển thị theo phần trăm.
+- Xác định đúng phiên boot cần trình bày.
+- Không cộng hoặc gộp các phiên boot sai cách.
+
+Phân biệt:
+- Không có dữ liệu.
+- Giá trị thực bằng 0.
+- Không kết nối được máy chủ.
+
+Không sử dụng 0 thay cho toàn bộ các trường hợp chưa có dữ liệu.
+
+4.3. Sửa truy vấn Lịch sử
+
+Kiểm tra history.tsx.
+
+Hiện tại khoảng frm và to được tính bằng useMemo chỉ phụ thuộc selectedRange.
+
+Cần đảm bảo khi React Query refetch, thời điểm kết thúc được cập nhật.
+
+Giữ nguyên:
+- Hôm nay: từ 00:00 giờ địa phương đến hiện tại.
+- 7 ngày: 7 ngày gần nhất theo logic sản phẩm hiện có.
+- 30 ngày: 30 ngày gần nhất theo logic sản phẩm hiện có.
+
+Yêu cầu:
+- Query key ổn định.
+- Không tạo query mới liên tục mỗi giây.
+- Không để refetch sử dụng timestamp cũ.
+- Giữ đúng timezone hiện tại.
+- Không làm mất dữ liệu cũ trong quá trình chuyển bộ lọc.
+- Hiển thị trạng thái lỗi và cho phép thử lại.
+
+Rà soát công thức tính tổng điện năng và độ hoàn thiện theo ý nghĩa dữ liệu Backend. Không tự ý thay đổi định nghĩa thống kê.
+
+4.4. Sửa biểu đồ Dự báo
+
+Kiểm tra:
+- forecast.tsx
+- power-chart.tsx
+- Response /history
+- Response /forecast?model=xgboost
+- Response /forecast?model=naive
+
+Vấn đề cần giải quyết:
+
+Biểu đồ hiện có nguy cơ ghép đường dữ liệu dựa theo vị trí phần tử trong mảng, thay vì timestamp thực tế.
+
+Thiết kế biểu đồ theo trục thời gian thống nhất.
+
+Yêu cầu:
+- Lịch sử là dữ liệu quá khứ.
+- Dự báo là dữ liệu tương lai.
+- Có mốc phân cách hiện tại.
+- XGBoost và Naive được thể hiện thành hai chuỗi độc lập.
+- Đảm bảo mỗi giá trị được đặt tại đúng slot.
+- Không gán dữ liệu của timestamp này vào timestamp khác.
+- Không biến dữ liệu thiếu thành công suất bằng 0.
+- Không nối đường biểu đồ qua các khoảng thiếu dữ liệu nếu điều đó gây hiểu nhầm.
+- Phải xác minh khả năng biểu diễn điểm thiếu của thư viện chart đang dùng.
+
+Nếu thư viện hiện tại không hỗ trợ biểu diễn dữ liệu thiếu chính xác, hãy chọn phương án hiển thị phù hợp với khả năng thực tế của thư viện mà không làm sai trục thời gian.
+
+Giữ nguyên nguồn dự báo và mô hình ML.
+
+4.5. Chuẩn hóa trạng thái truy vấn
+
+Tất cả màn hình dùng React Query cần có:
+- Initial Loading.
+- Background Refresh.
+- Success.
+- Empty Data.
+- API Error.
+- Retry.
+- Disabled Monitoring.
+- Offline.
+- Stale Data.
+
+Không nhầm lẫn giữa lỗi truy vấn và danh sách rỗng.
+
+Đặc biệt kiểm tra những query đang catch lỗi và trả về [], vì cách này có thể che giấu lỗi máy chủ.
+
+5. GIAI ĐOẠN 2 – XÂY DỰNG DESIGN SYSTEM
+
+5.1. Định hướng nghệ thuật
+
+Phong cách:
+Minimalist Modern Industrial IoT Dashboard
+
+Lấy cảm hứng từ:
+- Apple.
+- Linear.
+- Các dashboard phân tích năng lượng chuyên nghiệp.
+- Industrial monitoring systems.
+
+Yêu cầu:
+- Tối giản.
+- Chuyên nghiệp.
+- Thanh lịch.
+- Tập trung thông tin.
+- Dễ đọc.
+- Dễ thao tác.
+- Không sử dụng hiệu ứng quá mức.
+
+Tuyệt đối tránh:
+- Gradient sặc sỡ.
+- Neon glow.
+- Glassmorphism quá mức.
+- Card lồng nhiều lớp.
+- Shadow nặng.
+- Icon trang trí không cần thiết.
+- Emoji xuất hiện ở hầu hết tiêu đề.
+- Chuyển động không có ý nghĩa.
+- Màu sắc ngẫu nhiên giữa các màn hình.
+
+5.2. Bảng màu
+
+Ưu tiên hệ màu đã có trong DESIGN.md và theme-context.tsx.
+
+Light Theme:
+Background:       #F8FAFC
+Surface:          #FFFFFF
+Text Primary:     #0F172A
+Text Secondary:   #475569
+Border:           #E2E8F0
+Accent:           #2563EB
+Success:          #16A34A
+Warning:          #D97706
+Error:            #DC2626
+
+Dark Theme:
+Background:       #0B1120
+Surface:          #151E32
+Text Primary:     #F8FAFC
+Text Secondary:   #94A3B8
+Border:           #1E293B
+Accent:           #38BDF8
+Success:          #22C55E
+Warning:          #FBBF24
+Error:            #F87171
+
+Không tạo bảng màu mới nếu bảng màu cũ vẫn đáp ứng được yêu cầu.
+
+Nếu cần bổ sung token:
+- Bổ sung vào nguồn định nghĩa theme chung.
+- Đảm bảo Light/Dark tương ứng.
+- Không khai báo màu riêng rải rác trong từng file.
+- Không hardcode màu hex trực tiếp trong StyleSheet nếu có semantic token phù hợp.
+
+5.3. Typography
+
+Chuẩn hóa:
+Display: 28px / Bold 700
+Title:   20px / Semi-bold 600
+Heading: 16px / Semi-bold 600
+Body:    14px / Regular 400
+Caption: 12px / Medium 500
+Unit:    11px / Regular 400
+
+Có thể điều chỉnh theo kích thước thiết bị nhưng phải giữ phân cấp rõ ràng.
+
+Ưu tiên system font theo nền tảng.
+
+5.4. Spacing và component
+
+Chuẩn hóa:
+Spacing: 4 / 8 / 12 / 16 / 24 / 32 px
+Radius: 6 / 10 / 16 px
+Border: 1 px hoặc hairline
+Touch Target: Tối thiểu 44 x 44 px
+
+Tạo hoặc hoàn thiện các component dùng chung:
+- AppHeader.
+- AppSidebar.
+- AppBottomNavigation.
+- StatCard.
+- MetricCard.
+- StatusBadge.
+- SectionHeader.
+- EmptyState.
+- ErrorState.
+- LoadingState.
+- MonitorSwitch.
+- PowerChart.
+- ConfirmationModal.
+- SettingsSection.
+
+Chỉ tạo component nếu thực sự được tái sử dụng.
+
+Không tạo quá nhiều component nhỏ khiến code khó bảo trì.
+
+6. GIAI ĐOẠN 3 – REDESIGN TOÀN BỘ ỨNG DỤNG
+
+Phải chỉnh sửa tất cả màn hình và đảm bảo cùng một ngôn ngữ thiết kế.
+
+6.1. Màn hình Login
+
+File: src/app/login.tsx
+
+Thiết kế lại:
+- Giao diện đăng nhập hiện đại, sạch sẽ.
+- Logo hoặc nhận diện ứng dụng tối giản.
+- Tiêu đề hệ thống rõ ràng.
+- Form đăng nhập tập trung.
+- Input có trạng thái focus.
+- Hiện/ẩn mật khẩu.
+- Nút đăng nhập có Loading.
+- Hiển thị lỗi dễ hiểu.
+- Hỗ trợ thao tác bàn phím và Enter trên Web.
+- Hỗ trợ Light và Dark.
+
+Bảo mật:
+- Không điền sẵn mật khẩu mặc định.
+- Không lưu mật khẩu dạng plaintext.
+- Không đưa token vào log.
+- Không xóa cơ chế JWT hiện có.
+
+Trường Server URL:
+- Có thể chỉnh sửa.
+- Kiểm tra URL hợp lệ.
+- Thông báo localhost chỉ phù hợp với trường hợp máy chủ chạy trên cùng thiết bị.
+- Hướng dẫn người dùng cấu hình IP LAN khi thử nghiệm bằng điện thoại.
+
+Không hardcode IP LAN cá nhân thành cấu hình bắt buộc.
+
+6.2. Màn hình Tổng quan
+
+File: src/app/(tabs)/index.tsx
+
+Đây là màn hình quan trọng nhất.
+
+Thiết kế Dashboard theo thứ tự:
+
+Khu vực đầu trang:
+- Tiêu đề Tổng quan.
+- Mô tả ngắn.
+- Trạng thái thiết bị.
+- Trạng thái kết nối.
+- Nút hoặc công tắc giám sát.
+
+Khu vực KPI:
+Công suất tức thời phải nổi bật nhất.
+
+Các thông số:
+1. Công suất (W).
+2. Điện áp (V).
+3. Dòng điện (A).
+4. Điện năng (kWh).
+5. Hệ số công suất (PF).
+6. Tần số (Hz).
+
+Mỗi card gồm:
+- Tên đại lượng.
+- Giá trị.
+- Đơn vị.
+- Trạng thái.
+- Thông tin phụ cần thiết.
+
+Không dùng icon cho mọi card. Nếu sử dụng icon thì phải có ý nghĩa trực tiếp.
+
+Khu vực biểu đồ:
+- Biểu đồ công suất realtime.
+- Trục thời gian.
+- Giá trị theo đúng timestamp.
+- Không làm biểu đồ giật hoặc render toàn bộ component không cần thiết mỗi giây.
+
+Khu vực cảnh báo:
+Hiển thị ba sự kiện gần nhất.
+Có thể nhấn để chuyển sang màn hình Cảnh báo.
+
+Trạng thái hệ thống:
+Phân biệt:
+- Đang tắt giám sát.
+- Đang kết nối.
+- Đang chờ dữ liệu.
+- Dữ liệu bị trễ.
+- Offline.
+- Có lỗi.
+
+Không hiển thị dữ liệu cũ như dữ liệu trực tiếp.
+
+6.3. Màn hình Lịch sử
+
+File: src/app/(tabs)/history.tsx
+
+Thanh điều khiển:
+- Hôm nay.
+- 7 ngày.
+- 30 ngày.
+- Nút làm mới.
+- Nút xuất CSV.
+
+Các thẻ chỉ số:
+- Tổng tiêu thụ.
+- Công suất trung bình.
+- Công suất đỉnh.
+- Độ hoàn thiện.
+
+Biểu đồ:
+- Đường công suất.
+- Trục thời gian rõ ràng.
+- Không nhồi quá nhiều nhãn.
+- Hiển thị tooltip khi có thể.
+- Responsive theo container thực tế.
+
+Bảng dữ liệu:
+- Thời gian.
+- Công suất trung bình.
+- Độ hoàn thiện.
+- Trạng thái chất lượng mẫu.
+
+Trên Mobile:
+- Không để bảng làm tràn ngang toàn bộ màn hình.
+- Có thể dùng bảng cuộn ngang bên trong khu vực riêng.
+- Đảm bảo chữ không bị cắt.
+
+Xuất CSV:
+- Giữ chức năng xuất CSV hiện tại trên Web.
+- Bổ sung luồng lưu hoặc chia sẻ tệp trên Android/iOS nếu khả thi.
+- Không làm thay đổi nội dung dữ liệu xuất.
+- Xử lý quyền truy cập file hợp lý.
+
+6.4. Màn hình Dự báo AI
+
+File: src/app/(tabs)/forecast.tsx
+
+Thiết kế theo hướng phân tích dữ liệu.
+
+Khu vực thông tin mô hình:
+- Tên mô hình.
+- Trạng thái sẵn sàng.
+- Thời gian dự báo.
+- Chu kỳ 15 phút.
+- 96 bước tương ứng 24 giờ nếu dữ liệu đầy đủ.
+
+Khu vực KPI:
+- Điện năng dự kiến.
+- Đỉnh phụ tải.
+- Thời điểm đỉnh.
+- Công suất trung bình.
+- Số bước dự báo hiện có.
+
+Khu vực biểu đồ:
+Có ba chuỗi dữ liệu:
+- Thực tế.
+- XGBoost.
+- Seasonal Naive.
+
+Dùng màu theo semantic chart tokens.
+
+Phải thể hiện rõ:
+- Dữ liệu đã xảy ra.
+- Mốc hiện tại.
+- Dữ liệu tương lai.
+- Khoảng thời gian dự báo.
+
+Khu vực phân tích:
+- Xu hướng tăng/giảm.
+- Đỉnh phụ tải dự kiến.
+- Cảnh báo vượt ngưỡng.
+- Nhận xét dựa trên số liệu thực tế.
+
+Không tạo nhận định AI nếu không đủ dữ liệu.
+
+Khu vực Metrics:
+- MAE.
+- RMSE.
+- sMAPE.
+- Tên mô hình.
+- Thời điểm đánh giá.
+- Số lượng mẫu.
+
+Chỉ hiển thị những dữ liệu Backend thực sự cung cấp.
+
+Bảng 96 bước:
+- STT.
+- Thời điểm.
+- Công suất dự báo.
+- Mô hình.
+
+Responsive trên điện thoại.
+
+6.5. Màn hình Cảnh báo
+
+File: src/app/(tabs)/alerts.tsx
+
+Khu vực thống kê:
+- Tổng số sự kiện.
+- Cảnh báo nguy cấp.
+- Cảnh báo thông thường.
+- Sự kiện AI.
+
+Các số liệu thống kê phải tính từ dữ liệu Backend.
+
+Thanh tìm kiếm:
+- Tìm theo loại sự kiện.
+- Thiết bị.
+- Ghi chú.
+
+Bộ lọc:
+- Tất cả.
+- Quá công suất.
+- Quá dòng.
+- Điện áp.
+- Bất thường AI.
+- Lệnh rơ-le.
+
+Danh sách sự kiện:
+Mỗi sự kiện gồm:
+- Loại sự kiện.
+- Mức độ.
+- Thiết bị.
+- Giá trị đo.
+- Ngưỡng.
+- Thời gian.
+- Nội dung ghi chú.
+
+Đối với lệnh rơ-le:
+- Trạng thái đã nhận.
+- Trạng thái xác nhận tiếp điểm.
+- Mã lệnh.
+- Trường hợp lỗi.
+
+Không nhầm lẫn dữ liệu rỗng với lỗi API.
+
+Tối ưu hiệu năng danh sách.
+
+6.6. Màn hình Điều khiển
+
+File: src/app/(tabs)/control.tsx
+
+Đây là khu vực thao tác thiết bị thật nên ưu tiên tính an toàn hơn tính thẩm mỹ.
+
+Khu vực trạng thái:
+- Trạng thái rơ-le.
+- Trạng thái thiết bị.
+- Thời điểm cập nhật gần nhất.
+- Mã lệnh gần nhất nếu có.
+
+Khu vực điều khiển:
+Hai hành động:
+- Đóng rơ-le.
+- Ngắt rơ-le.
+
+Nút phải:
+- Dễ nhìn.
+- Dễ bấm.
+- Có trạng thái disabled khi đang xử lý.
+- Không cho gửi lệnh lặp.
+
+Modal xác nhận:
+Hiển thị rõ:
+- Hành động sắp thực hiện.
+- Tác động của thao tác.
+- Nút xác nhận.
+- Nút hủy.
+
+Tiến trình xác nhận ba bước:
+Bước 1: Đã gửi lệnh.
+Bước 2: ESP32 đã nhận lệnh.
+Bước 3: Tiếp điểm phụ xác nhận.
+
+Mỗi bước có trạng thái:
+- Chờ.
+- Đang xử lý.
+- Hoàn thành.
+- Thất bại.
+- Timeout.
+
+Không dùng trạng thái optimistic để kết luận rơ-le đã chuyển mạch thành công.
+
+Lịch sử thao tác:
+Hiển thị:
+- Thời điểm.
+- Đóng/ngắt.
+- Mã lệnh.
+- Xác nhận ESP32.
+- Xác nhận tiếp điểm.
+
+Viewer chỉ được xem, không có nút điều khiển.
+
+6.7. Màn hình Cài đặt
+
+File: src/app/(tabs)/settings.tsx
+
+Chia thành các nhóm rõ ràng.
+
+Tài khoản:
+- Username.
+- Role.
+- Đăng xuất.
+
+Giao diện:
+- Light.
+- Dark.
+- System.
+
+Máy chủ:
+- Server URL.
+- Refresh interval.
+- Nút lưu.
+- Nút kiểm tra kết nối.
+
+Chẩn đoán mạng:
+- MQTT telemetry received.
+- Duplicate packets.
+- Disconnect count.
+- Reconnect average.
+- Packet loss.
+- WebSocket latency.
+
+Thông tin hệ thống:
+Hiển thị công nghệ:
+- ESP32.
+- PZEM-004T.
+- Mosquitto.
+- FastAPI.
+- SQLite WAL.
+- XGBoost.
+- Expo React Native.
+
+Không làm trang Cài đặt trở thành nơi chứa quá nhiều thông tin không liên quan. Sử dụng các section hoặc disclosure phù hợp.
+
+7. GIAI ĐOẠN 4 – RESPONSIVE VÀ ĐIỀU HƯỚNG ĐA NỀN TẢNG
+
+Ứng dụng phải hoạt động trên Web Desktop, Web Mobile, Android và iOS.
+
+7.1. Web Desktop
+
+Với màn hình từ 900px:
+- Sử dụng sidebar/navigation rail dọc.
+- Sidebar khoảng 220–240px.
+- Nội dung nằm bên phải.
+- Max width nội dung khoảng 1200px.
+- Bố cục KPI nhiều cột.
+- Biểu đồ rộng.
+- Header có trạng thái kết nối.
+- Khoảng cách thoáng, không kéo giãn quá mức.
+
+7.2. Tablet
+
+Với màn hình 600–899px:
+- Bố cục 2–3 cột tùy không gian.
+- Không đơn thuần phóng to giao diện điện thoại.
+- Không để sidebar chiếm quá nhiều diện tích.
+- Cho phép các thẻ tự chuyển dòng.
+
+7.3. Mobile
+
+Với màn hình khoảng 390px:
+- Một cột hoặc hai cột phù hợp.
+- Padding ngang 16px.
+- Không cuộn ngang toàn trang.
+- Không để text tràn.
+- Safe Area đầy đủ.
+- Navigation dễ thao tác.
+- Nút đủ lớn.
+- Biểu đồ không bị cắt.
+- Keyboard không che input.
+- Modal không vượt quá viewport.
+
+Giữ đầy đủ sáu route.
+
+Không được âm thầm ẩn chức năng quan trọng trên Mobile.
+
+7.4. Điều hướng
+
+Kiểm tra:
+- src/app/(tabs)/_layout.tsx
+- src/components/app-tabs.tsx
+- src/components/app-tabs.web.tsx
+
+Thiết kế:
+- Desktop: sidebar.
+- Mobile: bottom navigation hoặc hình thức phù hợp với sáu màn hình.
+- Tablet: điều hướng thích ứng.
+
+Không sử dụng quá nhiều icon.
+
+Ưu tiên icon có ý nghĩa, cùng một bộ nét và cùng kích thước. Có thể tái sử dụng hệ icon hiện có.
+
+Tên màn hình:
+- Tổng quan.
+- Lịch sử.
+- Dự báo.
+- Cảnh báo.
+- Điều khiển.
+- Cài đặt.
+
+8. GIAI ĐOẠN 5 – THEME VÀ ACCESSIBILITY
+
+Phải hỗ trợ đầy đủ:
+- Light.
+- Dark.
+- System.
+
+Yêu cầu:
+- Mọi màn hình đổi theme đồng bộ.
+- Biểu đồ thay đổi màu phù hợp.
+- Status badge có đủ độ tương phản.
+- Modal, input và navigation phải tương thích theme.
+- Không còn màu hardcode gây lệch theme.
+- Theme được lưu và khôi phục sau khi khởi động lại.
+- Không gây flash theme sai khi app mới mở.
+
+Accessibility:
+- Vùng chạm tối thiểu 44×44px.
+- Text có độ tương phản tốt.
+- Có accessibilityLabel cho các nút tương tác.
+- Hỗ trợ keyboard navigation trên Web.
+- Có focus state.
+- Nội dung không phụ thuộc hoàn toàn vào màu sắc.
+- Không dùng font quá nhỏ cho số liệu quan trọng.
+- Hỗ trợ Safe Area.
+
+9. TỐI ƯU HIỆU NĂNG
+
+Rà soát toàn bộ frontend.
+
+Các yêu cầu:
+- Tránh rerender toàn bộ Dashboard mỗi giây.
+- Memoize component và selector khi thực sự có lợi.
+- Dùng useMemo/useCallback đúng mục đích.
+- Tránh tạo object/function không cần thiết trong danh sách lớn.
+- Tối ưu FlatList.
+- Sử dụng stable keys.
+- Không dùng Math.random() làm key.
+- Tối ưu biểu đồ với dữ liệu nhiều điểm.
+- Không tạo quá nhiều request API.
+- Không mở WebSocket trùng.
+- Không chạy request khi giám sát đã tắt.
+- Không để interval hoặc timeout chạy sau khi component unmount.
+- Không tạo nhiều QueryClient.
+- Xử lý lỗi kết nối khi ứng dụng chuyển trạng thái foreground/background.
+
+Đảm bảo không đánh đổi độ chính xác dữ liệu lấy hiệu năng.
+
+10. CÁC TÍNH NĂNG CẦN RÀ SOÁT THÊM
+
+Đọc PRODUCT.md và đối chiếu từng tính năng với code hiện có.
+
+Kiểm tra:
+1. Thông báo trên điện thoại.
+2. Ước tính tiền điện.
+3. Dự báo ARIMA.
+4. Xuất CSV trên Android/iOS.
+5. Trạng thái rơ-le sau khi khởi động lại ứng dụng.
+6. Trạng thái kết nối thiết bị.
+7. Tài khoản admin/viewer.
+8. Đăng xuất và khôi phục phiên.
+9. Khả năng xử lý khi Backend offline.
+
+Phân loại kết quả:
+- Đã triển khai.
+- Đã triển khai nhưng chưa hoàn thiện.
+- Chưa triển khai.
+- Backend chưa hỗ trợ.
+- Chưa đủ căn cứ để kết luận.
+
+Không tạo UI giả cho những tính năng Backend chưa hỗ trợ.
+
+Đối với ước tính tiền điện:
+- Không tự bịa đơn giá.
+- Không tự áp dụng biểu giá nếu chưa có thông tin được xác nhận.
+- Chỉ triển khai phép tính khi có nguồn biểu giá phù hợp.
+
+Đối với Push Notification:
+- Kiểm tra khả năng Backend hỗ trợ đăng ký token.
+- Không giả định chỉ cần cài expo-notifications là hệ thống đã gửi thông báo được.
+
+Nếu tính năng cần thay đổi Backend, hãy giữ nguyên phạm vi Frontend và báo rõ phần cần được phát triển phía Backend.
+
+11. NGUYÊN TẮC SỬ DỤNG THƯ VIỆN
+
+Trước khi thêm dependency:
+1. Kiểm tra package hiện có.
+2. Kiểm tra API của thư viện đã được dùng.
+3. Ưu tiên tái sử dụng.
+4. Chỉ thêm thư viện khi thực sự cần thiết.
+5. Không cài hai thư viện thực hiện cùng chức năng.
+6. Không tự ý nâng phiên bản Expo, React Native hoặc React.
+
+Với dự án Expo, sử dụng:
+
+npx expo install <package>
+
+khi cần cài package tương thích SDK.
+
+Không sử dụng npm install tùy tiện để thay thế dependency hiện tại.
+
+12. QUY TRÌNH THỰC THI
+
+Thực hiện lần lượt.
+
+Bước 1 – Audit
+- Đọc toàn bộ tài liệu dự án.
+- Đọc toàn bộ sáu màn hình.
+- Đọc components.
+- Đọc hooks.
+- Đọc các context và services.
+- Đọc API contract từ Backend.
+- Kiểm tra các thư viện.
+- Kiểm tra thiết kế hiện tại.
+- Xác định lỗi và các phụ thuộc.
+
+Tạo một danh sách phát hiện cụ thể.
+
+Bước 2 – Sửa lỗi nền tảng
+- WebSocket.
+- Diagnostics.
+- History.
+- Forecast timestamp.
+- API error handling.
+- State consistency.
+
+Bước 3 – Refactor component và theme
+- Xây dựng thành phần dùng chung.
+- Chuẩn hóa design tokens.
+- Chuẩn hóa header.
+- Chuẩn hóa card.
+- Chuẩn hóa trạng thái.
+
+Bước 4 – Redesign sáu màn hình
+Thực hiện lần lượt theo thứ tự:
+1. Login.
+2. Overview.
+3. History.
+4. Forecast.
+5. Alerts.
+6. Control.
+7. Settings.
+
+Không bỏ sót màn hình nào.
+
+Sau mỗi màn hình:
+- Kiểm tra code.
+- Kiểm tra theme.
+- Kiểm tra Responsive.
+- Kiểm tra chức năng hiện tại.
+
+Bước 5 – Kiểm thử tổng thể
+
+Chạy:
+
+npx tsc --noEmit
+npx expo lint
+
+Nếu có test framework:
+- Chạy test hiện có.
+- Bổ sung test cho những utility mới quan trọng.
+- Không thêm test framework mới chỉ để tạo số lượng test.
+
+Kiểm tra các kịch bản:
+
+Authentication:
+- Đăng nhập thành công.
+- Đăng nhập sai.
+- Token hết hạn.
+- Đăng xuất.
+- Admin.
+- Viewer.
+
+Monitor:
+- Tắt giám sát.
+- Bật giám sát.
+- WebSocket kết nối.
+- WebSocket mất kết nối.
+- Reconnect.
+- Dữ liệu Stale.
+- Backend offline.
+
+History:
+- Hôm nay.
+- 7 ngày.
+- 30 ngày.
+- Không có dữ liệu.
+- API lỗi.
+- Xuất CSV.
+
+Forecast:
+- Đầy đủ dữ liệu.
+- Thiếu dữ liệu.
+- Thiếu metrics.
+- Không có mô hình dự báo.
+- Các chuỗi timestamp lệch nhau.
+
+Alerts:
+- Có sự kiện.
+- Không có sự kiện.
+- Lọc.
+- Tìm kiếm.
+- API lỗi.
+
+Relay:
+- Admin gửi lệnh.
+- Viewer không gửi được lệnh.
+- Xác nhận ba bước.
+- Phản hồi thất bại.
+- Timeout.
+- Không phản hồi tiếp điểm.
+
+Theme và Responsive:
+- Light.
+- Dark.
+- System.
+- Desktop.
+- Tablet.
+- Mobile.
+- Web.
+- Android.
+- iOS.
+
+Chỉ tuyên bố đã kiểm thử trên thiết bị khi thực sự đã chạy trên thiết bị hoặc simulator phù hợp.
+
+13. TIÊU CHÍ NGHIỆM THU
+
+Dự án chỉ được xem là hoàn thành khi:
+- Tất cả sáu màn hình hoạt động.
+- Không mất các route hiện có.
+- Không mất chức năng API.
+- Không thay đổi MQTT contract.
+- Không thay đổi thuật toán ML.
+- Không bỏ cơ chế xác nhận rơ-le.
+- WebSocket không tạo kết nối trùng.
+- Diagnostics hiển thị đúng response.
+- Lịch sử cập nhật đúng khoảng thời gian.
+- Biểu đồ dự báo đúng timestamp.
+- Light/Dark/System hoạt động.
+- Web Desktop bố trí cân đối.
+- Mobile không tràn ngang.
+- Không có lỗi TypeScript mới.
+- Không có lỗi lint mới.
+- Không có trạng thái dữ liệu gây hiểu lầm.
+- Không để lộ mật khẩu mặc định.
+- Không sử dụng dữ liệu giả trong giao diện thật.
+
+Chất lượng cuối cùng phải đạt mức một ứng dụng có thể trình diễn nghiêm túc trong buổi bảo vệ khóa luận.
+
+14. BÁO CÁO SAU KHI THỰC HIỆN
+
+Sau khi trực tiếp chỉnh sửa, tạo báo cáo gồm:
+
+A. Những file đã chỉnh sửa
+- Đường dẫn file.
+- Lý do thay đổi.
+- Nội dung thay đổi.
+- Ảnh hưởng đến hệ thống.
+
+B. Những lỗi đã sửa
+- Lỗi ban đầu.
+- Nguyên nhân.
+- Giải pháp.
+- Kết quả sau sửa.
+
+C. Giao diện đã nâng cấp
+Mô tả từng màn hình:
+- Login.
+- Overview.
+- History.
+- Forecast.
+- Alerts.
+- Control.
+- Settings.
+
+D. Những chức năng bổ sung
+Phân biệt:
+- Đã hoàn thành.
+- Cần Backend hỗ trợ.
+- Chưa thực hiện.
+- Cần người dùng cung cấp dữ liệu.
+
+E. Kết quả kiểm thử
+Liệt kê chính xác:
+- TypeScript.
+- Lint.
+- Tests.
+- Web.
+- Mobile.
+- API.
+- MQTT.
+- WebSocket.
+- Relay.
+
+Ghi rõ kiểm thử nào đã chạy, kiểm thử nào chưa thể thực hiện và nguyên nhân.
+
+F. Các vấn đề còn tồn tại
+Không che giấu lỗi chưa giải quyết.
+
+G. Hướng dẫn chạy ứng dụng
+Cung cấp các lệnh thực tế để chạy:
+- Backend.
+- Expo Web.
+- Android.
+- iOS.
+
+H. Tổng kết
+Đánh giá tình trạng dự án:
+- Hoàn thành.
+- Hoàn thành một phần.
+- Còn tồn tại lỗi cần khắc phục.
+
+15. YÊU CẦU CUỐI CÙNG CHO AI AGENT
+
+Hãy làm việc như một kỹ sư chịu trách nhiệm trực tiếp với sản phẩm, không phải một công cụ chỉ đưa ra gợi ý.
+
+Ưu tiên:
+Độ chính xác kỹ thuật > Tính ổn định > Trải nghiệm người dùng > Tính thẩm mỹ.
+
+Không chỉnh sửa tùy tiện để đạt được một giao diện đẹp nhưng làm sai dữ liệu hoặc ảnh hưởng thiết bị thật.
+
+Không cần hỏi lại những yêu cầu đã được xác định trong prompt.
+
+Trong quá trình thực hiện:
+- Chủ động phát hiện lỗi.
+- Chủ động tìm nguyên nhân gốc.
+- Chỉnh sửa ở đúng tầng kiến trúc.
+- Tái sử dụng component.
+- Giữ code dễ bảo trì.
+- Không bỏ qua kiểm thử.
+- Không báo cáo thành công khi chưa có bằng chứng.
+
+BẮT ĐẦU BẰNG VIỆC AUDIT REPOSITORY, SAU ĐÓ TRỰC TIẾP THỰC HIỆN TOÀN BỘ CÔNG VIỆC TRONG PHẠM VI ĐÃ XÁC ĐỊNH.
+
+YÊU CẦU BỔ SUNG SAU MỖI GIAI ĐOẠN
+
+Trước khi chuyển sang giai đoạn tiếp theo, hãy kiểm tra các thay đổi vừa thực hiện, đối chiếu API contract, chạy TypeScript và lint nếu môi trường hỗ trợ.
+
+Không được chuyển tiếp khi còn lỗi mới phát sinh do chính thay đổi vừa thực hiện. Giữ lại các chức năng hoạt động trước đó.

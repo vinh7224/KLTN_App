@@ -15,6 +15,7 @@ export interface LiveTelemetry {
   e?: number;
   f?: number;
   pf?: number;
+  relay_state?: number;
   server_ts?: number;
   latencyMs: number | null;
   stale: boolean;
@@ -53,6 +54,8 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
   const backoffRef = useRef<number>(1000); // 1s -> 2s -> 4s -> ... -> max 15s
   const isEnabledRef = useRef(enabled);
   isEnabledRef.current = enabled;
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
 
   const cleanup = useCallback(() => {
     if (reconnectTimerRef.current) {
@@ -60,18 +63,21 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
       reconnectTimerRef.current = null;
     }
     if (wsRef.current) {
-      wsRef.current.onclose = null;
-      wsRef.current.onerror = null;
-      wsRef.current.onmessage = null;
-      wsRef.current.onopen = null;
-      wsRef.current.close();
+      const socket = wsRef.current;
       wsRef.current = null;
+      socket.onclose = null;
+      socket.onerror = null;
+      socket.onmessage = null;
+      socket.onopen = null;
+      try {
+        socket.close();
+      } catch {}
     }
     setConnected(false);
   }, []);
 
   const connect = useCallback(async () => {
-    if (!isEnabledRef.current || !token) {
+    if (!isEnabledRef.current || !tokenRef.current) {
       cleanup();
       return;
     }
@@ -83,21 +89,24 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
       const base = rawBase && rawBase.trim() ? rawBase.trim().replace(/\/+$/, "") : "http://localhost:8000";
       const wsProtocol = base.startsWith("https") ? "wss" : "ws";
       const hostPart = base.replace(/^https?:\/\//, "");
-      const wsUrl = `${wsProtocol}://${hostPart}/ws/live?token=${encodeURIComponent(token)}`;
+      const wsUrl = `${wsProtocol}://${hostPart}/ws/live?token=${encodeURIComponent(tokenRef.current)}`;
 
       const ws = new WebSocket(wsUrl);
       wsRef.current = ws;
 
       ws.onopen = () => {
-        if (isEnabledRef.current) {
+        if (wsRef.current === ws && isEnabledRef.current) {
           setConnected(true);
-          backoffRef.current = 1000; // Reset exponential backoff on successful connect
+          backoffRef.current = 1000; // Reset backoff on success
         } else {
-          ws.close();
+          try {
+            ws.close();
+          } catch {}
         }
       };
 
       ws.onmessage = (e) => {
+        if (wsRef.current !== ws) return;
         try {
           const raw = JSON.parse(e.data);
           if (raw && typeof raw === "object") {
@@ -118,27 +127,34 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
               setTelemetry(null);
             }
           }
-        } catch {}
+        } catch {
+          // Ignore corrupt JSON packets gracefully without crash
+        }
       };
 
       ws.onerror = () => {
-        setConnected(false);
+        if (wsRef.current === ws) {
+          setConnected(false);
+        }
       };
 
       ws.onclose = () => {
-        setConnected(false);
-        if (isEnabledRef.current) {
-          if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-          const delay = backoffRef.current;
-          backoffRef.current = Math.min(15000, delay * 2); // Exponential backoff up to 15s
-          reconnectTimerRef.current = setTimeout(() => {
-            connect();
-          }, delay);
+        if (wsRef.current === ws) {
+          setConnected(false);
+          wsRef.current = null;
+          if (isEnabledRef.current && tokenRef.current) {
+            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
+            const delay = backoffRef.current;
+            backoffRef.current = Math.min(15000, delay * 2); // Exponential backoff up to 15s
+            reconnectTimerRef.current = setTimeout(() => {
+              connect();
+            }, delay);
+          }
         }
       };
     } catch {
       setConnected(false);
-      if (isEnabledRef.current) {
+      if (isEnabledRef.current && tokenRef.current) {
         if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
         const delay = backoffRef.current;
         backoffRef.current = Math.min(15000, delay * 2);
@@ -147,7 +163,7 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
         }, delay);
       }
     }
-  }, [token, cleanup]);
+  }, [cleanup]);
 
   // Handle lifecycle and token/enabled changes
   useEffect(() => {
@@ -165,10 +181,15 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
     }
   }, [enabled, token, connect, cleanup]);
 
+  // Evaluate stale status continuously (if device timestamp is > 5s behind wall-clock time)
+  const isDataStale = telemetry
+    ? !telemetry.ts || now / 1000 - telemetry.ts > 5
+    : false;
+
   const data = telemetry
     ? {
         ...telemetry,
-        stale: !telemetry.ts || now / 1000 - telemetry.ts > 5,
+        stale: isDataStale,
       }
     : null;
 
@@ -178,7 +199,7 @@ export function LiveProvider({ children }: { children: React.ReactNode }) {
     connected,
     data,
     latencyMs: data?.latencyMs ?? null,
-    stale: data?.stale ?? false,
+    stale: isDataStale,
     reconnect: () => {
       backoffRef.current = 1000;
       connect();

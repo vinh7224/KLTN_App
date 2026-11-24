@@ -7,7 +7,6 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
-  Platform,
   useWindowDimensions,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -17,6 +16,10 @@ import { useMonitor } from "@/lib/monitor";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SystemHeader } from "@/components/ui/system-header";
 import { MonitorSwitch } from "@/components/monitor-switch";
+import { StatCard } from "@/components/stat-card";
+import { ErrorState } from "@/components/ui/error-state";
+import { EmptyState } from "@/components/ui/empty-state";
+import { LoadingState } from "@/components/ui/loading-state";
 import { useAppTheme } from "@/lib/theme-context";
 
 interface KindInfo {
@@ -57,6 +60,8 @@ export default function Alerts() {
   const {
     data = [],
     isLoading,
+    isError,
+    error,
     refetch,
   } = useQuery({
     queryKey: ["events"],
@@ -64,6 +69,27 @@ export default function Alerts() {
     enabled: enabled,
     refetchInterval: enabled ? refresh : false,
   });
+
+  // Calculate statistics from backend data
+  const stats = useMemo(() => {
+    let dangerCount = 0;
+    let warningCount = 0;
+    let aiCount = 0;
+
+    for (const e of data) {
+      const info = KIND_NAMES[e.kind];
+      if (info?.severity === "danger") dangerCount++;
+      if (info?.severity === "warning") warningCount++;
+      if (e.kind === "over_forecast" || e.kind === "night_load") aiCount++;
+    }
+
+    return {
+      total: data.length,
+      danger: dangerCount,
+      warning: warningCount,
+      ai: aiCount,
+    };
+  }, [data]);
 
   // Filter events
   const filteredEvents = useMemo(() => {
@@ -93,7 +119,7 @@ export default function Alerts() {
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
       <SystemHeader
-        title="🔔 Cảnh báo & Sự kiện"
+        title="Cảnh báo & Sự kiện"
         subtitle="Nhật ký vi phạm ngưỡng an toàn, phát hiện bất thường AI và lệnh điều khiển"
       />
 
@@ -131,6 +157,42 @@ export default function Alerts() {
           </View>
         ) : (
           <>
+            {/* STATS OVERVIEW CARDS */}
+            <View style={styles.statsRow}>
+              <StatCard
+                label="Tổng sự kiện"
+                value={stats.total}
+                unit="bản ghi"
+                digits={0}
+                secondaryInfo="Lưu trữ trong CSDL"
+                status="normal"
+              />
+              <StatCard
+                label="Cảnh báo nguy cấp"
+                value={stats.danger}
+                unit="lần"
+                digits={0}
+                secondaryInfo="Quá tải, quá dòng"
+                status={stats.danger > 0 ? "danger" : "good"}
+              />
+              <StatCard
+                label="Cảnh báo thông thường"
+                value={stats.warning}
+                unit="lần"
+                digits={0}
+                secondaryInfo="Dao động điện áp"
+                status={stats.warning > 0 ? "warning" : "good"}
+              />
+              <StatCard
+                label="Bất thường AI"
+                value={stats.ai}
+                unit="phát hiện"
+                digits={0}
+                secondaryInfo="Đêm muộn, vượt forecast"
+                status={stats.ai > 0 ? "warning" : "normal"}
+              />
+            </View>
+
             {/* SEARCH AND FILTER BAR */}
             <View style={styles.controlsBar}>
               <TextInput
@@ -151,7 +213,6 @@ export default function Alerts() {
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                style={styles.filterScrollView}
                 contentContainerStyle={styles.filterScroll}
               >
                 {FILTERS.map((f) => {
@@ -188,164 +249,157 @@ export default function Alerts() {
               </ScrollView>
             </View>
 
-            {/* EVENTS LIST */}
-            <FlatList
-              style={styles.list}
-              contentContainerStyle={styles.listContent}
-              data={filteredEvents}
-              keyExtractor={(e, index) =>
-                e.id != null
-                  ? String(e.id)
-                  : `${e.detected_at ?? e.cmd_sent_at ?? 0}-${e.kind ?? "event"}-${index}`
-              }
-              refreshing={isLoading}
-              onRefresh={refetch}
-              ListEmptyComponent={
-                <View
-                  style={[
-                    styles.emptyContainer,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                    },
-                  ]}
-                >
-                  <Text style={[styles.emptyTitle, { color: colors.textSecondary }]}>
-                    Không có sự kiện cảnh báo nào phù hợp
-                  </Text>
-                </View>
-              }
-              renderItem={({ item: e }) => {
-                const info = KIND_NAMES[e.kind] ?? {
-                  label: e.kind,
-                  severity: "info" as const,
-                  unit: "",
-                };
+            {/* ERROR STATE */}
+            {isError ? (
+              <ErrorState
+                title="Lỗi tải danh sách sự kiện"
+                message={(error as any)?.message || "Không thể tải dữ liệu từ endpoint /events."}
+                onRetry={() => refetch()}
+              />
+            ) : isLoading && !data.length ? (
+              <LoadingState message="Đang tải nhật ký sự kiện..." height={200} />
+            ) : (
+              /* EVENTS LIST */
+              <FlatList
+                style={styles.list}
+                contentContainerStyle={styles.listContent}
+                data={filteredEvents}
+                keyExtractor={(e, index) =>
+                  e.id != null
+                    ? String(e.id)
+                    : `${e.detected_at ?? e.cmd_sent_at ?? 0}-${e.kind ?? "event"}-${index}`
+                }
+                refreshing={isLoading}
+                onRefresh={refetch}
+                ListEmptyComponent={
+                  <EmptyState
+                    title="Không có sự kiện phù hợp"
+                    description="Không tìm thấy bản ghi sự kiện hoặc cảnh báo nào theo tiêu chí lọc hiện tại."
+                  />
+                }
+                renderItem={({ item: e }) => {
+                  const info = KIND_NAMES[e.kind] ?? {
+                    label: e.kind,
+                    severity: "info" as const,
+                    unit: "",
+                  };
 
-                const isRelay = e.kind === "relay_cmd";
-                const isAnomaly = e.kind === "over_forecast" || e.kind === "night_load";
-                const eventTime = new Date((e.detected_at ?? e.cmd_sent_at) * 1000).toLocaleString("vi-VN");
+                  const isRelay = e.kind === "relay_cmd";
+                  const eventTime = new Date((e.detected_at ?? e.cmd_sent_at) * 1000).toLocaleString("vi-VN");
 
-                return (
-                  <View
-                    style={[
-                      styles.eventCard,
-                      {
-                        backgroundColor: colors.surface,
-                        borderColor: colors.border,
-                      },
-                    ]}
-                  >
-                    <View style={styles.cardHeader}>
-                      <View style={styles.headerLeft}>
-                        <Text style={[styles.eventTitle, { color: colors.text }]}>{info.label}</Text>
-                        <Text style={[styles.eventDevice, { color: colors.textSecondary }]}>
-                          Thiết bị: {e.device_id ?? "esp32-01"}
-                        </Text>
-                      </View>
-
-                      <StatusBadge
-                        status={
-                          info.severity === "danger"
-                            ? "danger"
-                            : info.severity === "warning"
-                            ? "warning"
-                            : "info"
-                        }
-                        label={
-                          info.severity === "danger"
-                            ? "Nguy cấp"
-                            : isAnomaly
-                            ? "AI phát hiện"
-                            : info.severity === "warning"
-                            ? "Cảnh báo"
-                            : "Nhật ký"
-                        }
-                      />
-                    </View>
-
-                    {/* Measurements vs Threshold */}
-                    {e.value != null && (
-                      <View
-                        style={[
-                          styles.metricBox,
-                          {
-                            backgroundColor: colors.surfaceSubtle,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.metricText, { color: colors.text }]}>
-                          Đo được: <Text style={{ fontWeight: "600" }}>{e.value}{info.unit}</Text>
-                        </Text>
-                        {e.threshold != null && (
-                          <>
-                            <Text style={[styles.metricDivider, { color: colors.border }]}>·</Text>
-                            <Text style={[styles.metricText, { color: colors.textSecondary }]}>
-                              Ngưỡng: {e.threshold}{info.unit}
-                            </Text>
-                            {e.value > e.threshold && (
-                              <>
-                                <Text style={[styles.metricDivider, { color: colors.border }]}>·</Text>
-                                <Text style={[styles.metricText, { color: colors.error }]}>
-                                  Vượt: +{Math.round((e.value - e.threshold) * 10) / 10}{info.unit}
-                                </Text>
-                              </>
-                            )}
-                          </>
-                        )}
-                      </View>
-                    )}
-
-                    {/* Relay Specific Feedback */}
-                    {isRelay && (
-                      <View
-                        style={[
-                          styles.metricBox,
-                          {
-                            backgroundColor: colors.surfaceSubtle,
-                            borderColor: colors.border,
-                          },
-                        ]}
-                      >
-                        <Text
-                          style={[
-                            styles.relayStatusText,
-                            {
-                              color:
-                                e.verified === 1
-                                  ? colors.success
-                                  : e.verified === 0
-                                  ? colors.error
-                                  : colors.textSecondary,
-                            },
-                          ]}
-                        >
-                          {e.verified === 1
-                            ? "✓ Tiếp điểm phụ đã xác nhận khớp lệnh"
-                            : e.verified === 0
-                            ? "⚠️ Cảnh báo: Tiếp điểm phụ không khớp lệnh"
-                            : "⏳ Đang chờ phản hồi tiếp điểm phụ..."}
-                        </Text>
-                        {e.cmd_id && (
-                          <Text style={[styles.cmdText, { color: colors.textSecondary }]}>
-                            · Lệnh #{e.cmd_id}
+                  return (
+                    <View
+                      style={[
+                        styles.eventCard,
+                        {
+                          backgroundColor: colors.surface,
+                          borderColor: colors.border,
+                        },
+                      ]}
+                    >
+                      <View style={styles.cardHeader}>
+                        <View style={styles.headerLeft}>
+                          <Text style={[styles.eventTitle, { color: colors.text }]}>{info.label}</Text>
+                          <Text style={[styles.eventDevice, { color: colors.textSecondary }]}>
+                            Thiết bị: {e.device_id ?? "esp32-01"} · {eventTime}
                           </Text>
+                        </View>
+
+                        <StatusBadge
+                          status={
+                            info.severity === "danger"
+                              ? "danger"
+                              : info.severity === "warning"
+                              ? "warning"
+                              : "primary"
+                          }
+                          label={
+                            info.severity === "danger"
+                              ? "Nguy cấp"
+                              : info.severity === "warning"
+                              ? "Cảnh báo"
+                              : "Thông tin"
+                          }
+                        />
+                      </View>
+
+                      {/* MEASUREMENT OR COMMAND VALUES */}
+                      <View style={[styles.cardBody, { backgroundColor: colors.surfaceSubtle }]}>
+                        {isRelay ? (
+                          <View style={styles.relayDetails}>
+                            <View style={styles.detailRow}>
+                              <Text style={[styles.detailKey, { color: colors.textSecondary }]}>Thao tác lệnh:</Text>
+                              <Text
+                                style={[
+                                  styles.detailVal,
+                                  { color: e.value === 1.0 ? colors.success : colors.error, fontWeight: "600" },
+                                ]}
+                              >
+                                {e.value === 1.0 ? "ĐÓNG RƠ-LE (BẬT)" : "NGẮT RƠ-LE (TẮT)"}
+                              </Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                              <Text style={[styles.detailKey, { color: colors.textSecondary }]}>Mã lệnh:</Text>
+                              <Text style={[styles.detailVal, { color: colors.text }]}>
+                                #{e.cmd_id || e.id}
+                              </Text>
+                            </View>
+                            <View style={styles.detailRow}>
+                              <Text style={[styles.detailKey, { color: colors.textSecondary }]}>Xác nhận tiếp điểm:</Text>
+                              <Text
+                                style={[
+                                  styles.detailVal,
+                                  {
+                                    color:
+                                      e.verified === 1
+                                        ? colors.success
+                                        : e.verified === 0
+                                        ? colors.error
+                                        : colors.warning,
+                                    fontWeight: "600",
+                                  },
+                                ]}
+                              >
+                                {e.verified === 1
+                                  ? "Khớp tiếp điểm phụ (GPIO 27)"
+                                  : e.verified === 0
+                                  ? "Lỗi tiếp điểm phụ"
+                                  : e.cmd_acked_at != null
+                                  ? "ESP32 đã nhận lệnh"
+                                  : "Đang chờ phản hồi"}
+                              </Text>
+                            </View>
+                          </View>
+                        ) : (
+                          <View style={styles.metricDetails}>
+                            <View style={styles.detailRow}>
+                              <Text style={[styles.detailKey, { color: colors.textSecondary }]}>Giá trị ghi nhận:</Text>
+                              <Text style={[styles.detailVal, { color: colors.text, fontWeight: "700" }]}>
+                                {e.value != null ? e.value.toFixed(1) : "--"} {info.unit}
+                              </Text>
+                            </View>
+                            {e.threshold != null && (
+                              <View style={styles.detailRow}>
+                                <Text style={[styles.detailKey, { color: colors.textSecondary }]}>Ngưỡng quy định:</Text>
+                                <Text style={[styles.detailVal, { color: colors.textSecondary }]}>
+                                  {e.threshold} {info.unit}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
                         )}
                       </View>
-                    )}
 
-                    {/* Footer */}
-                    <View style={[styles.cardFooter, { borderTopColor: colors.border }]}>
-                      <Text style={[styles.timeText, { color: colors.textSecondary }]}>{eventTime}</Text>
                       {e.note && (
-                        <Text style={[styles.noteText, { color: colors.textSecondary }]}>{e.note}</Text>
+                        <Text style={[styles.eventNote, { color: colors.textSecondary }]}>
+                          Ghi chú: {e.note}
+                        </Text>
                       )}
                     </View>
-                  </View>
-                );
-              }}
-            />
+                  );
+                }}
+              />
+            )}
           </>
         )}
       </View>
@@ -360,155 +414,126 @@ const styles = StyleSheet.create({
   mainContainer: {
     flex: 1,
     padding: 16,
-    maxWidth: 1100,
+    gap: 16,
+    maxWidth: 1200,
     width: "100%",
     alignSelf: "center",
-    gap: 12,
   },
   mainContainerMobile: {
     padding: 12,
+    gap: 12,
+  },
+  statsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
     gap: 10,
-  },
-  disabledCard: {
-    padding: 32,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    marginTop: 8,
-  },
-  disabledBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  disabledBadgeText: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  disabledTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  disabledDesc: {
-    fontSize: 13,
-    textAlign: "center",
-    maxWidth: 400,
-    lineHeight: 18,
   },
   controlsBar: {
-    flexDirection: "column",
-    alignItems: "stretch",
-    gap: 8,
+    gap: 10,
   },
   searchInput: {
-    width: "100%",
-    minHeight: 38,
+    height: 42,
     borderRadius: 6,
     borderWidth: 1,
     paddingHorizontal: 12,
-    paddingVertical: 7,
     fontSize: 13,
-    ...(Platform.OS === "web" ? ({ outlineStyle: "none" } as any) : {}),
-  },
-  filterScrollView: {
-    width: "100%",
   },
   filterScroll: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
+    gap: 8,
     paddingVertical: 2,
   },
   segmentBtn: {
-    paddingHorizontal: 14,
+    paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 18,
+    borderRadius: 6,
     borderWidth: 1,
-    minHeight: 32,
-    justifyContent: "center",
-    alignItems: "center",
-    ...(Platform.OS === "web" ? ({ cursor: "pointer" } as any) : {}),
   },
   segmentBtnText: {
     fontSize: 12,
-    fontWeight: "500",
   },
   list: {
     flex: 1,
   },
   listContent: {
     gap: 10,
-    paddingBottom: 20,
+    paddingBottom: 24,
   },
   eventCard: {
     borderRadius: 8,
-    padding: 14,
     borderWidth: 1,
+    padding: 14,
     gap: 10,
   },
   cardHeader: {
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 10,
   },
   headerLeft: {
+    flex: 1,
     gap: 2,
   },
   eventTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: "600",
   },
   eventDevice: {
     fontSize: 11,
   },
-  metricBox: {
+  cardBody: {
+    padding: 10,
+    borderRadius: 6,
+  },
+  relayDetails: {
+    gap: 4,
+  },
+  metricDetails: {
+    gap: 4,
+  },
+  detailRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 4,
-    borderWidth: 1,
-    gap: 6,
-  },
-  metricText: {
-    fontSize: 12,
-  },
-  metricDivider: {
-    fontSize: 12,
-  },
-  relayStatusText: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  cmdText: {
-    fontSize: 11,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
-    paddingTop: 8,
-    borderTopWidth: StyleSheet.hairlineWidth,
+    alignItems: "center",
   },
-  timeText: {
-    fontSize: 11,
+  detailKey: {
+    fontSize: 12,
   },
-  noteText: {
+  detailVal: {
+    fontSize: 12,
+  },
+  eventNote: {
     fontSize: 11,
     fontStyle: "italic",
   },
-  emptyContainer: {
-    padding: 32,
-    alignItems: "center",
-    justifyContent: "center",
+  disabledCard: {
+    padding: 24,
     borderRadius: 8,
     borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
   },
-  emptyTitle: {
-    fontSize: 13,
+  disabledBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  disabledBadgeText: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  disabledTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    marginTop: 4,
+  },
+  disabledDesc: {
+    fontSize: 12,
+    textAlign: "center",
+    maxWidth: 380,
+    lineHeight: 18,
   },
 });
