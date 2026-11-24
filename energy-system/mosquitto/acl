@@ -1,0 +1,8 @@
+user esp32
+topic write energy/+/telemetry
+topic write energy/+/status
+topic write energy/+/relay/state
+topic read energy/+/cmd/relay
+
+user backend
+topic readwrite energy/#
