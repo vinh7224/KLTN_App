@@ -193,7 +193,11 @@ export default function Alerts() {
               style={styles.list}
               contentContainerStyle={styles.listContent}
               data={filteredEvents}
-              keyExtractor={(e) => String(e.id ?? `${e.device_id}_${e.detected_at}_${Math.random()}`)}
+              keyExtractor={(e, index) =>
+                e.id != null
+                  ? String(e.id)
+                  : `${e.detected_at ?? e.cmd_sent_at ?? 0}-${e.kind ?? "event"}-${index}`
+              }
               refreshing={isLoading}
               onRefresh={refetch}
               ListEmptyComponent={

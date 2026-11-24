@@ -1,0 +1,14 @@
+# Git ignore for root repository
+
+.agent/
+.agents/
+.env
+*.env
+node_modules/
+.expo/
+dist/
+__pycache__/
+*.pyc
+.venv/
+*.db
+!schema.sql

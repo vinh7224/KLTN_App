@@ -141,9 +141,8 @@ export default function Forecast() {
 
   const chartLegends: LegendItem[] = useMemo(() => {
     return [
-      { label: "Thực tế", color: colors.accent, style: "solid" },
-      { label: "Dự báo XGBoost", color: colors.primary, style: "dashed" },
-      { label: "Baseline Naive", color: colors.warning, style: "dotted" },
+      { label: "24h Quá khứ", color: colors.accent, style: "solid" },
+      { label: "24h Dự báo XGBoost", color: colors.primary, style: "dashed" },
     ];
   }, [colors]);
 
@@ -380,12 +379,10 @@ export default function Forecast() {
                     points2={xgbPoints.length > 0 ? xgbPoints : undefined}
                     color2={colors.primary}
                     strokeDashArray2={[6, 4]}
-                    points3={naivePoints.length > 0 ? naivePoints : undefined}
-                    color3={colors.warning}
-                    strokeDashArray3={[2, 3]}
                     legend={chartLegends}
                     height={220}
                     unit=" W"
+                    isContinuous48h={actualPoints.length > 0 && xgbPoints.length > 0}
                   />
                 )}
               </FuturisticCard>

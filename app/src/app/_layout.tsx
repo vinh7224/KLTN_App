@@ -4,6 +4,7 @@ import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "@/lib/auth";
 import { ThemeProvider, useAppTheme } from "@/lib/theme-context";
 import { MonitorProvider } from "@/lib/monitor";
+import { LiveProvider } from "@/context/LiveContext";
 
 const qc = new QueryClient();
 
@@ -34,7 +35,9 @@ export default function Root() {
       <ThemeProvider>
         <AuthProvider>
           <MonitorProvider>
-            <Routes />
+            <LiveProvider>
+              <Routes />
+            </LiveProvider>
           </MonitorProvider>
         </AuthProvider>
       </ThemeProvider>

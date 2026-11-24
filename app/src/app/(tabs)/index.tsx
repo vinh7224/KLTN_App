@@ -5,7 +5,6 @@ import {
   View,
   StyleSheet,
   ActivityIndicator,
-  Pressable,
   useWindowDimensions,
 } from "react-native";
 import { useQuery } from "@tanstack/react-query";
@@ -13,79 +12,12 @@ import { useLive } from "@/hooks/use-live";
 import { useMonitor } from "@/lib/monitor";
 import { useAppTheme } from "@/lib/theme-context";
 import { MonitorSwitch } from "@/components/monitor-switch";
+import { SystemHeader } from "@/components/ui/system-header";
+import { StatCard } from "@/components/stat-card";
 import { api } from "@/lib/api";
-
-/* ── Cấu hình từng thẻ đại lượng điện ── */
-interface StatDef {
-  key: string;
-  icon: string;
-  label: string;
-  unit: string;
-  getValue: (d: any) => string;
-  getHint: (d: any, status: string) => string;
-  getStatus: (d: any) => "normal" | "warning" | "error";
-}
-
-const STATS: StatDef[] = [
-  {
-    key: "power",
-    icon: "⚡",
-    label: "CÔNG SUẤT",
-    unit: "W",
-    getValue: (d) => (d?.p != null ? d.p.toFixed(1) : "--"),
-    getHint: (_d, s) => (s === "error" ? "⚠️ Quá tải > 2000W" : "Định mức an toàn"),
-    getStatus: (d) => (!d?.p ? "normal" : d.p > 2000 ? "error" : d.p > 1500 ? "warning" : "normal"),
-  },
-  {
-    key: "voltage",
-    icon: "🔌",
-    label: "ĐIỆN ÁP",
-    unit: "V",
-    getValue: (d) => (d?.v != null ? d.v.toFixed(1) : "--"),
-    getHint: () => "Ngưỡng: 200 – 245V",
-    getStatus: (d) => (!d?.v ? "normal" : d.v < 200 ? "warning" : d.v > 245 ? "error" : "normal"),
-  },
-  {
-    key: "current",
-    icon: "🔋",
-    label: "DÒNG ĐIỆN",
-    unit: "A",
-    getValue: (d) => (d?.i != null ? d.i.toFixed(2) : "--"),
-    getHint: (_d, s) => (s === "error" ? "⚠️ Quá dòng > 10A" : "Tối đa 10A"),
-    getStatus: (d) => (!d?.i ? "normal" : d.i > 10 ? "error" : d.i > 7 ? "warning" : "normal"),
-  },
-  {
-    key: "energy",
-    icon: "📊",
-    label: "ĐIỆN NĂNG",
-    unit: "kWh",
-    getValue: (d) => (d?.e != null ? d.e.toFixed(3) : "--"),
-    getHint: () => "Tổng tích lũy từ công tơ",
-    getStatus: () => "normal",
-  },
-  {
-    key: "pf",
-    icon: "📐",
-    label: "HỆ SỐ CS",
-    unit: "PF",
-    getValue: (d) => (d?.pf != null ? d.pf.toFixed(2) : "--"),
-    getHint: (d) => (d?.pf != null && d.pf >= 0.85 ? "Tốt (≥ 0.85)" : "Hao phí phản kháng"),
-    getStatus: () => "normal",
-  },
-  {
-    key: "freq",
-    icon: "🌊",
-    label: "TẦN SỐ",
-    unit: "Hz",
-    getValue: (d) => (d?.f != null ? d.f.toFixed(1) : "--"),
-    getHint: () => "Chuẩn 50 Hz",
-    getStatus: () => "normal",
-  },
-];
 
 export default function Overview() {
   const { width } = useWindowDimensions();
-  // Breakpoint: < 600 = mobile 2-col, 600-899 = tablet 3-col, >= 900 = desktop
   const isMobile = width < 600;
   const { colors } = useAppTheme();
   const { enabled } = useMonitor();
@@ -106,23 +38,48 @@ export default function Overview() {
     ? new Date(data.ts * 1000).toLocaleTimeString("vi-VN")
     : null;
 
-  /* ── Hàm lấy màu theo trạng thái ngưỡng ── */
-  const statusColor = (s: string) =>
-    s === "error" ? colors.error : s === "warning" ? colors.warning : colors.text;
+  // Đánh giá ngưỡng kỹ thuật
+  const voltageStatus = !data?.v
+    ? "normal"
+    : data.v < 200 || data.v > 245
+    ? "warning"
+    : "good";
+
+  const currentStatus = !data?.i
+    ? "normal"
+    : data.i > 10
+    ? "danger"
+    : data.i > 7
+    ? "warning"
+    : "good";
+
+  const powerStatus = !data?.p
+    ? "normal"
+    : data.p > 2000
+    ? "danger"
+    : data.p > 1500
+    ? "warning"
+    : "good";
+
+  const pfStatus = !data?.pf
+    ? "normal"
+    : data.pf >= 0.85
+    ? "good"
+    : "warning";
+
+  const freqStatus = !data?.f
+    ? "normal"
+    : data.f >= 49.5 && data.f <= 50.5
+    ? "good"
+    : "warning";
 
   return (
     <View style={[styles.screen, { backgroundColor: colors.background }]}>
-      {/* HEADER — thu gọn trên mobile */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text }]}>
-          ⚡ Tổng quan điện năng
-        </Text>
-        {!isMobile && (
-          <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
-            Giám sát phụ tải thời gian thực từ ESP32 & cảm biến PZEM-004T
-          </Text>
-        )}
-      </View>
+      {/* HEADER DÙNG CHUNG CỦA HỆ THỐNG */}
+      <SystemHeader
+        title="Tổng quan điện năng"
+        subtitle="Giám sát phụ tải thời gian thực từ ESP32 & PZEM-004T"
+      />
 
       <ScrollView contentContainerStyle={[styles.content, isMobile && styles.contentMobile]}>
         {/* MONITOR SWITCH */}
@@ -158,77 +115,120 @@ export default function Overview() {
                 />
                 <Text style={[styles.statusText, { color: colors.text }]} numberOfLines={1}>
                   {isOnline
-                    ? "Trực tiếp"
+                    ? "Dữ liệu trực tiếp từ ESP32"
                     : connected
-                    ? "Chờ PZEM…"
-                    : "Đang kết nối…"}
+                    ? "Chờ dữ liệu đo PZEM-004T..."
+                    : "Đang kết nối lại máy chủ..."}
                 </Text>
                 {data?.latencyMs != null && (
                   <Text style={[styles.latencyText, { color: colors.textSecondary }]}>
-                    {data.latencyMs}ms
+                    Độ trễ: {data.latencyMs}ms
                   </Text>
                 )}
               </View>
               {formattedTime && (
                 <Text style={[styles.updateTime, { color: colors.textSecondary }]}>
-                  Mẫu gần nhất: {formattedTime}
+                  Thời điểm mẫu: {formattedTime}
                 </Text>
               )}
             </View>
 
-            {/* GRID CÁC THẺ — 2 cột trên mobile, 3 cột trên tablet/desktop */}
+            {/* LƯỚI 6 THÔNG SỐ ĐO PZEM-004T BẰNG STATCARD */}
             <View style={styles.grid}>
-              {STATS.map((st) => {
-                const status = st.getStatus(data);
-                return (
-                  <Pressable
-                    key={st.key}
-                    style={({ hovered }) => [
-                      styles.statCard,
-                      isMobile && styles.statCardMobile,
-                      {
-                        backgroundColor: colors.surface,
-                        borderColor: colors.border,
-                        ...(hovered && { opacity: 0.85, transform: [{ scale: 1.02 }] }),
-                      },
-                    ]}
-                  >
-                    {/* Icon + Label */}
-                    <View style={styles.statHeader}>
-                      <Text style={styles.statIcon}>{st.icon}</Text>
-                      <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                        {st.label}
-                      </Text>
-                    </View>
-                    {/* Giá trị số liệu */}
-                    <View style={styles.statValueRow}>
-                      <Text
-                        style={[
-                          isMobile ? styles.statValueMobile : styles.statValue,
-                          { color: statusColor(status) },
-                        ]}
-                        numberOfLines={1}
-                        adjustsFontSizeToFit
-                      >
-                        {st.getValue(data)}
-                      </Text>
-                      <Text style={[styles.statUnit, { color: colors.textSecondary }]}>
-                        {st.unit}
-                      </Text>
-                    </View>
-                    {/* Ghi chú */}
-                    <Text style={[styles.statHint, { color: colors.textSecondary }]} numberOfLines={1}>
-                      {st.getHint(data, status)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              <StatCard
+                label="Điện áp RMS"
+                value={data?.v}
+                unit="V"
+                digits={1}
+                nominal="220V"
+                secondaryInfo={
+                  data?.v == null
+                    ? "Ngưỡng: 200 - 245V"
+                    : data.v < 200
+                    ? "Thấp áp lưới (< 200V)"
+                    : data.v > 245
+                    ? "Quá áp lưới (> 245V)"
+                    : "Điện áp danh định an toàn"
+                }
+                status={voltageStatus}
+              />
+
+              <StatCard
+                label="Dòng điện tải"
+                value={data?.i}
+                unit="A"
+                digits={2}
+                nominal="Max 10A"
+                secondaryInfo={
+                  data?.i == null
+                    ? "Định mức tối đa 10A"
+                    : data.i > 10
+                    ? "Cảnh báo quá dòng (> 10A)"
+                    : data.i > 7
+                    ? "Tải cao (> 7A)"
+                    : "Dòng phụ tải ổn định"
+                }
+                status={currentStatus}
+              />
+
+              <StatCard
+                label="Công suất tác dụng"
+                value={data?.p}
+                unit="W"
+                digits={1}
+                nominal="Max 2000W"
+                secondaryInfo={
+                  data?.p == null
+                    ? "Định mức an toàn 2000W"
+                    : data.p > 2000
+                    ? "Cảnh báo quá tải (> 2000W)"
+                    : data.p > 1500
+                    ? "Tiêu thụ cao (> 1500W)"
+                    : "Công suất trong định mức"
+                }
+                status={powerStatus}
+              />
+
+              <StatCard
+                label="Điện năng tích lũy"
+                value={data?.e}
+                unit="kWh"
+                digits={3}
+                secondaryInfo="Tổng tích lũy từ công tơ"
+                status="normal"
+              />
+
+              <StatCard
+                label="Hệ số công suất"
+                value={data?.pf}
+                unit="PF"
+                digits={2}
+                nominal=">= 0.85"
+                secondaryInfo={
+                  data?.pf == null
+                    ? "Hiệu suất tiêu chuẩn >= 0.85"
+                    : data.pf >= 0.85
+                    ? "Hiệu suất tốt (>= 0.85)"
+                    : "Hao phí công suất phản kháng"
+                }
+                status={pfStatus}
+              />
+
+              <StatCard
+                label="Tần số lưới"
+                value={data?.f}
+                unit="Hz"
+                digits={1}
+                nominal="50Hz"
+                secondaryInfo="Tần số điện lưới chuẩn 50Hz"
+                status={freqStatus}
+              />
             </View>
 
             {/* CẢNH BÁO GẦN ĐÂY */}
             <View style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <Text style={[styles.cardTitle, { color: colors.text }]}>
-                🔔 Cảnh báo gần nhất
+                Cảnh báo gần nhất
               </Text>
               {eventsQuery.isLoading ? (
                 <ActivityIndicator size="small" color={colors.accent} style={{ marginTop: 8 }} />
@@ -238,15 +238,15 @@ export default function Overview() {
                     <View key={ev.id} style={[styles.alarmItem, { borderBottomColor: colors.border }]}>
                       <Text style={[styles.alarmKind, { color: colors.warning }]} numberOfLines={1}>
                         {ev.kind === "over_power"
-                          ? "⚡ Quá công suất"
+                          ? "Quá công suất"
                           : ev.kind === "over_current"
-                          ? "🔋 Quá dòng"
+                          ? "Quá dòng"
                           : ev.kind === "voltage"
-                          ? "🔌 Điện áp bất thường"
+                          ? "Bất thường điện áp"
                           : ev.kind === "night_load"
-                          ? "🌙 Tải đêm bất thường"
+                          ? "Tiêu thụ bất thường ban đêm"
                           : ev.kind === "over_forecast"
-                          ? "🤖 Nghi quên tắt"
+                          ? "Nghi quên tắt thiết bị"
                           : ev.kind}
                       </Text>
                       <Text style={[styles.alarmTime, { color: colors.textSecondary }]}>
@@ -257,7 +257,7 @@ export default function Overview() {
                 </View>
               ) : (
                 <Text style={[styles.emptyHint, { color: colors.textSecondary }]}>
-                  ✅ Hệ thống an toàn, chưa ghi nhận cảnh báo.
+                  Hệ thống an toàn, chưa ghi nhận cảnh báo bất thường.
                 </Text>
               )}
             </View>
@@ -268,29 +268,10 @@ export default function Overview() {
   );
 }
 
-/* ════════════════════════════════════════════
-   STYLES — Mobile-first, responsive grid
-   ════════════════════════════════════════════ */
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
-  /* ── Header ── */
-  header: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 10,
-    borderBottomWidth: 1,
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-  },
-  headerSubtitle: {
-    fontSize: 12,
-    marginTop: 2,
-  },
-  /* ── Content Area ── */
   content: {
     padding: 16,
     gap: 14,
@@ -302,7 +283,6 @@ const styles = StyleSheet.create({
     padding: 12,
     gap: 10,
   },
-  /* ── Disabled State ── */
   disabledCard: {
     padding: 24,
     borderRadius: 10,
@@ -327,7 +307,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
     maxWidth: 320,
   },
-  /* ── Status Banner ── */
   statusBanner: {
     padding: 10,
     borderRadius: 8,
@@ -356,64 +335,11 @@ const styles = StyleSheet.create({
     fontSize: 10,
     marginLeft: 14,
   },
-  /* ── Grid — responsive 2-col mobile, 3-col desktop ── */
   grid: {
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 10,
   },
-  /* ── Stat Card ── */
-  statCard: {
-    // Desktop/tablet: 3 cột (flex basis ~31%)
-    flexBasis: "31%",
-    flexGrow: 1,
-    minWidth: 140,
-    padding: 14,
-    borderRadius: 10,
-    borderWidth: 1,
-    gap: 2,
-  },
-  statCardMobile: {
-    // Mobile: 2 cột — mỗi card chiếm ~48% chiều rộng
-    flexBasis: "47%",
-    minWidth: 0,
-    padding: 12,
-  },
-  statHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  statIcon: {
-    fontSize: 13,
-  },
-  statLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    letterSpacing: 0.3,
-  },
-  statValueRow: {
-    flexDirection: "row",
-    alignItems: "baseline",
-    gap: 3,
-    marginVertical: 2,
-  },
-  statValue: {
-    fontSize: 28, // DESIGN.md Display Metric
-    fontWeight: "700",
-  },
-  statValueMobile: {
-    fontSize: 22, // Thu nhỏ trên điện thoại để không tràn
-    fontWeight: "700",
-  },
-  statUnit: {
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  statHint: {
-    fontSize: 10,
-  },
-  /* ── Alert Card ── */
   card: {
     padding: 14,
     borderRadius: 10,

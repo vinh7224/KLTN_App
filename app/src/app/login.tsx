@@ -13,11 +13,13 @@ import { useAuth } from "@/lib/auth";
 import { store } from "@/lib/storage";
 import { api } from "@/lib/api";
 import { useAppTheme, ThemeMode } from "@/lib/theme-context";
+import { getServerHistory, saveServerToHistory, DEFAULT_SERVER } from "@/utils/serverHistory";
 
 export default function Login() {
   const { signIn } = useAuth();
   const { colors, theme, setTheme } = useAppTheme();
-  const [server, setServer] = useState("http://localhost:8000");
+  const [server, setServer] = useState(DEFAULT_SERVER);
+  const [serverHistory, setServerHistory] = useState<string[]>([]);
   const [username, setUsername] = useState("admin");
   const [password, setPassword] = useState("12345");
   const [err, setErr] = useState("");
@@ -26,7 +28,9 @@ export default function Login() {
   useEffect(() => {
     store.get("server").then((s) => {
       if (s) setServer(s);
+      else setServer(DEFAULT_SERVER);
     });
+    getServerHistory().then(setServerHistory);
   }, []);
 
   const submit = async () => {
@@ -34,12 +38,15 @@ export default function Login() {
       setErr("");
       setLoading(true);
       const cleanServer = server.trim().replace(/\/+$/, "");
-      await store.set("server", cleanServer || "http://localhost:8000");
+      await store.set("server", cleanServer || DEFAULT_SERVER);
 
       const r = await api<{ token: string; role?: string; username?: string }>("/auth/login", {
         method: "POST",
         body: JSON.stringify({ username, password }),
       });
+
+      // Lưu địa chỉ server kết nối thành công vào lịch sử
+      await saveServerToHistory(cleanServer || DEFAULT_SERVER);
 
       await signIn(r.token, r.role, r.username);
     } catch (e: any) {
@@ -80,10 +87,9 @@ export default function Login() {
         <View style={styles.authContainer}>
           {/* HEADER */}
           <View style={styles.brandHeader}>
-            <Text style={{ fontSize: 40, marginBottom: 4 }}>⚡</Text>
             <Text style={[styles.title, { color: colors.text }]}>Giám sát Điện năng</Text>
             <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              IoT ESP32 + PZEM-004T & ML
+              Hệ thống IoT ESP32 & Machine Learning
             </Text>
           </View>
 
@@ -131,23 +137,24 @@ export default function Login() {
                 placeholderTextColor={colors.textSecondary}
               />
               <View style={styles.presetsRow}>
-                <Text style={[styles.presetLabel, { color: colors.textSecondary }]}>Chọn nhanh:</Text>
-                <Pressable
-                  style={[styles.presetBtn, { borderColor: colors.border }]}
-                  onPress={() => setServer("http://192.168.1.32:8000")}
-                >
-                  <Text style={[styles.presetBtnText, { color: colors.accent }]}>📱 IP PC: 192.168.1.32:8000</Text>
-                </Pressable>
-                <Pressable
-                  style={[styles.presetBtn, { borderColor: colors.border }]}
-                  onPress={() => setServer("http://localhost:8000")}
-                >
-                  <Text style={[styles.presetBtnText, { color: colors.accent }]}>💻 PC: localhost:8000</Text>
-                </Pressable>
+                <Text style={[styles.presetLabel, { color: colors.textSecondary }]}>Gần đây:</Text>
+                {serverHistory.map((s, idx) => (
+                  <Pressable
+                    key={idx}
+                    style={[styles.presetBtn, { borderColor: server === s ? colors.accent : colors.border }]}
+                    onPress={() => setServer(s)}
+                  >
+                    <Text
+                      style={[
+                        styles.presetBtnText,
+                        { color: server === s ? colors.accent : colors.textSecondary },
+                      ]}
+                    >
+                      {s.replace(/^https?:\/\//, "")}
+                    </Text>
+                  </Pressable>
+                ))}
               </View>
-              <Text style={{ fontSize: 11, color: colors.textSecondary, marginTop: 4 }}>
-                💡 Trên Android/iOS: Bắt buộc dùng IP máy tính (:8000), không dùng localhost.
-              </Text>
             </View>
 
             <View style={styles.fieldGroup}>

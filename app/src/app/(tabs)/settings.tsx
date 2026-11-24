@@ -19,6 +19,7 @@ import { FuturisticCard } from "@/components/ui/futuristic-card";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { SystemHeader } from "@/components/ui/system-header";
 import { useAppTheme, ThemeMode } from "@/lib/theme-context";
+import { getServerHistory, saveServerToHistory, DEFAULT_SERVER } from "@/utils/serverHistory";
 
 export default function Settings() {
   const { width } = useWindowDimensions();
@@ -29,11 +30,13 @@ export default function Settings() {
   const { latencyMs, connected, stale } = useLive();
   const ms = useRefreshMs();
   const [server, setServer] = useState("");
+  const [serverHistory, setServerHistory] = useState<string[]>([]);
   const [sec, setSec] = useState(String(ms / 1000));
   const [savedAlert, setSavedAlert] = useState(false);
 
   useEffect(() => {
-    store.get("server").then((s) => setServer(s ?? "http://localhost:8000"));
+    store.get("server").then((s) => setServer(s ?? DEFAULT_SERVER));
+    getServerHistory().then(setServerHistory);
   }, []);
 
   useEffect(() => {
@@ -60,8 +63,11 @@ export default function Settings() {
 
   const save = async () => {
     const cleanServer = server.trim().replace(/\/+$/, "");
-    await store.set("server", cleanServer || "http://localhost:8000");
+    const finalServer = cleanServer || DEFAULT_SERVER;
+    await store.set("server", finalServer);
     await store.set("refreshMs", String(Math.max(1, Number(sec) || 10) * 1000));
+    const updatedHistory = await saveServerToHistory(finalServer);
+    setServerHistory(updatedHistory);
     qc.invalidateQueries();
     setSavedAlert(true);
     setTimeout(() => setSavedAlert(false), 3000);
@@ -193,19 +199,23 @@ export default function Settings() {
             />
 
             <View style={styles.presetsRow}>
-              <Text style={[styles.presetTitle, { color: colors.textSecondary }]}>Chọn nhanh:</Text>
-              <Pressable
-                style={[styles.presetBtn, { borderColor: colors.border }]}
-                onPress={() => setServer("http://192.168.1.32:8000")}
-              >
-                <Text style={[styles.presetBtnText, { color: colors.accent }]}>📱 LAN 192.168.1.32:8000</Text>
-              </Pressable>
-              <Pressable
-                style={[styles.presetBtn, { borderColor: colors.border }]}
-                onPress={() => setServer("http://localhost:8000")}
-              >
-                <Text style={[styles.presetBtnText, { color: colors.accent }]}>💻 Localhost:8000 (PC)</Text>
-              </Pressable>
+              <Text style={[styles.presetTitle, { color: colors.textSecondary }]}>Gần đây:</Text>
+              {serverHistory.map((s, idx) => (
+                <Pressable
+                  key={idx}
+                  style={[styles.presetBtn, { borderColor: server === s ? colors.accent : colors.border }]}
+                  onPress={() => setServer(s)}
+                >
+                  <Text
+                    style={[
+                      styles.presetBtnText,
+                      { color: server === s ? colors.accent : colors.textSecondary },
+                    ]}
+                  >
+                    {s.replace(/^https?:\/\//, "")}
+                  </Text>
+                </Pressable>
+              ))}
             </View>
           </View>
 

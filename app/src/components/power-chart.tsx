@@ -25,6 +25,8 @@ interface PowerChartProps {
   unit?: string;
   showPeak?: boolean;
   legend?: LegendItem[];
+  // If true, stitches points (past 24h) and points2 (forecast 24h) along a continuous 48h timeline
+  isContinuous48h?: boolean;
 }
 
 export function PowerChart({
@@ -41,6 +43,7 @@ export function PowerChart({
   unit = " W",
   showPeak = false,
   legend,
+  isContinuous48h = false,
 }: PowerChartProps) {
   const { width } = useWindowDimensions();
   const { colors, isDark } = useAppTheme();
@@ -55,11 +58,105 @@ export function PowerChart({
   }, [width]);
 
   // Compute peak, average, and clean formatted data
-  const { peak, avg, chartData, chartData2, chartData3 } = useMemo(() => {
+  const { peak, avg, chartData, chartData2, chartData3, endIndex1, startIndex2, endIndex2 } = useMemo(() => {
     if (!points || points.length === 0) {
-      return { peak: 0, avg: 0, chartData: [], chartData2: undefined, chartData3: undefined };
+      return {
+        peak: 0,
+        avg: 0,
+        chartData: [],
+        chartData2: undefined,
+        chartData3: undefined,
+        endIndex1: undefined,
+        startIndex2: undefined,
+        endIndex2: undefined,
+      };
     }
 
+    // ----------------------------------------------------
+    // Continuous 48h mode: [Past 24h] -> [Anchor/Now] -> [Forecast 24h]
+    // ----------------------------------------------------
+    if (isContinuous48h && points2 && points2.length > 0) {
+      let maxVal = -Infinity;
+      let sum = 0;
+
+      for (const p of points) {
+        if (p.value > maxVal) maxVal = p.value;
+        sum += p.value;
+      }
+      for (const p of points2) {
+        if (p.value > maxVal) maxVal = p.value;
+      }
+      if (points3) {
+        for (const p of points3) {
+          if (p.value > maxVal) maxVal = p.value;
+        }
+      }
+
+      const calculatedAvg = sum / points.length;
+
+      // Downsample past and future consistently
+      const stepPast = points.length > 96 ? Math.ceil(points.length / 48) : 1;
+      const sampledPast = stepPast > 1 ? points.filter((_, idx) => idx % stepPast === 0) : points;
+
+      const stepFut = points2.length > 96 ? Math.ceil(points2.length / 48) : 1;
+      const sampledFut = stepFut > 1 ? points2.filter((_, idx) => idx % stepFut === 0) : points2;
+
+      // Anchor point: duplicate the last past point as the first forecast point for seamless continuity
+      const anchorPoint = sampledPast[sampledPast.length - 1];
+      const continuousPoints = [...sampledPast, ...sampledFut];
+
+      const pastLen = sampledPast.length;
+      const totalLen = continuousPoints.length;
+
+      // Label frequency (~6-8 labels along the 48h axis)
+      const labelInterval = Math.max(1, Math.floor(totalLen / 6));
+
+      // data1 (Solid: Past 24h up to anchor): values for past, dummy anchor repeat, then empty/0 or pad
+      // In gifted-charts, data1 can hold past points with values, then for index >= pastLen, we can use endIndex1
+      // Or provide data1 for pastLen, and data2 padded with past points as undefined/hide or starting at pastLen - 1.
+      // Gifted-charts supports startIndex2 & endIndex2 or continuous data arrays.
+      // To prevent NaN SVG path errors on Native:
+      // data1: past points (index 0..pastLen-1) + future points padded with the same value or null
+      // gifted-charts data2: points starting from pastLen - 1 (anchor point) to totalLen - 1
+      const formatted1 = continuousPoints.map((p, i) => {
+        const isLabelPoint = i % labelInterval === 0 || i === pastLen - 1 || i === totalLen - 1;
+        const timeStr = new Date(p.slot * 1000).toLocaleTimeString("vi-VN", {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+
+        const isPast = i < pastLen;
+        return {
+          value: isPast ? Math.round(p.value * 10) / 10 : Math.round(anchorPoint.value * 10) / 10,
+          label: isLabelPoint ? timeStr : "",
+          hideDataPoint: true,
+        };
+      });
+
+      // data2: Future points starting from anchor point
+      const formatted2 = continuousPoints.map((p, i) => {
+        const isFutureOrAnchor = i >= pastLen - 1;
+        return {
+          value: isFutureOrAnchor ? Math.round(p.value * 10) / 10 : Math.round(p.value * 10) / 10,
+          hideDataPoint: true,
+        };
+      });
+
+      return {
+        peak: Math.max(0, maxVal),
+        avg: Math.round(calculatedAvg * 10) / 10,
+        chartData: formatted1,
+        chartData2: formatted2,
+        chartData3: undefined,
+        endIndex1: pastLen - 1,
+        startIndex2: pastLen - 1,
+        endIndex2: totalLen - 1,
+      };
+    }
+
+    // ----------------------------------------------------
+    // Standard Overlapping / Single Line Mode (e.g. History)
+    // ----------------------------------------------------
     let maxVal = -Infinity;
     let sum = 0;
     for (const p of points) {
@@ -123,8 +220,11 @@ export function PowerChart({
       chartData: formatted,
       chartData2: formatted2,
       chartData3: formatted3,
+      endIndex1: undefined,
+      startIndex2: undefined,
+      endIndex2: undefined,
     };
-  }, [points, points2, points3]);
+  }, [points, points2, points3, isContinuous48h]);
 
   if (!points || points.length === 0) {
     return (
@@ -191,6 +291,9 @@ export function PowerChart({
           data={chartData}
           {...(chartData2 ? { data2: chartData2 } : {})}
           {...(chartData3 ? { data3: chartData3 } : {})}
+          endIndex1={endIndex1}
+          startIndex2={startIndex2}
+          endIndex2={endIndex2}
           width={chartWidth}
           height={height}
           initialSpacing={4}
@@ -210,7 +313,7 @@ export function PowerChart({
           hideDataPoints1
           hideDataPoints2
           hideDataPoints3
-          areaChart={!chartData2}
+          areaChart={!chartData2 && !isContinuous48h}
           startFillColor={chartColor}
           endFillColor={chartColor}
           startOpacity={isDark ? 0.15 : 0.08}
